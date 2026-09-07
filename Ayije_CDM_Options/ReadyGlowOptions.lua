@@ -29,7 +29,7 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
             local readyGlowResourceAware = existingOv.readyGlowResourceAware or false
             local checkbox = UI.CreateModernCheckbox(
                 rc,
-                L["Resource Aware"],
+                L["Only When Usable"],
                 readyGlowResourceAware,
                 function(checked)
                     local ov = cfg.ensureOv and cfg.ensureOv()
