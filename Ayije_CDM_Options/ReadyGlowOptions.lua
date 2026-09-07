@@ -6,6 +6,8 @@ local UI = ns and ns.ConfigUI
 local Shared = ns and ns.GroupEditorShared
 local L = Runtime.L
 
+L["Glow When Ready"] = L["Glow When CD Ready"]
+
 if not UI or not Shared or type(Shared.BuildTextOverrideWidgets) ~= "function" then return end
 if Shared._readyGlowResourceAwareWrapped then return end
 
