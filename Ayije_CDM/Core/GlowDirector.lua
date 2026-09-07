@@ -59,7 +59,9 @@ local function FanoutToFrames(cdID)
     local entry = map and map[cdID] or nil
     local spellID = spellIDByCdID[cdID]
     for frame in pairs(frames) do
-        sync(frame, entry, spellID, ComputeFrameReady(frame, spellID))
+        if frame.cdmGlowDirectorCdID == cdID and frame.cooldownID == cdID then
+            sync(frame, entry, spellID, ComputeFrameReady(frame, spellID))
+        end
     end
 end
 
@@ -185,7 +187,8 @@ end
 
 function GlowDirector:InstallAcquireResetHook(v)
     hooksecurefunc(v, "OnAcquireItemFrame", function(_, itemFrame)
-        itemFrame.cdmGlowDirectorCdID = nil
+        -- Keep the previous registration until SetCooldownID/ClearCooldownID can remove it.
+        -- Clearing it here leaves recycled frames registered under an old cooldownID.
         if itemFrame.cdmGlowLifecycleHooked then return end
         itemFrame.cdmGlowLifecycleHooked = true
 
