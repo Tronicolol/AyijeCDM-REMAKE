@@ -230,6 +230,7 @@ local function BuildMapEntry(entry, isDotDefault, auraOverlay)
         if entry.auraBorderEnabled then mapEntry.auraBorderEnabled = true end
         if entry.auraBorderColor then mapEntry.auraBorderColor = entry.auraBorderColor end
         if entry.readyGlowEnabled then mapEntry.readyGlowEnabled = true end
+        if entry.readyGlowResourceAware then mapEntry.readyGlowResourceAware = true end
         if entry.readyGlowColor then mapEntry.readyGlowColor = entry.readyGlowColor end
     end
     return mapEntry

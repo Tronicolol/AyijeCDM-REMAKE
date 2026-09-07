@@ -18,39 +18,76 @@ local spellIDByCdID = {}
 local cdIDsBySpellID = {}
 
 local GetSpellCharges = C_Spell.GetSpellCharges
+local C_Spell_GetSpellCooldown = C_Spell.GetSpellCooldown
 local C_Spell_IsSpellUsable = C_Spell.IsSpellUsable
+local C_Timer_After = C_Timer.After
 
-local usableEventFrame = CreateFrame("Frame")
-local usableBySpellID = {}
-local watchedSpellCount = 0
+local resourceAwareEventFrame = CreateFrame("Frame")
+resourceAwareEventFrame:Hide()
+local resourceAwareCdIDs = {}
+local resourceAwareCount = 0
+local resourceAwareRefreshPending = false
 
-local function RefreshUsableEventRegistration()
-    if watchedSpellCount > 0 then
-        usableEventFrame:RegisterEvent("SPELL_UPDATE_USABLE")
+local FanoutToFrames
+local QueueResourceAwareRefresh
+local OnSpellEvent
+
+local function RefreshResourceAwareEventRegistration()
+    if resourceAwareCount > 0 then
+        resourceAwareEventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
+        resourceAwareEventFrame:RegisterEvent("SPELL_UPDATE_USABLE")
+        resourceAwareEventFrame:RegisterUnitEvent("UNIT_POWER_FREQUENT", "player")
     else
-        usableEventFrame:UnregisterEvent("SPELL_UPDATE_USABLE")
+        resourceAwareEventFrame:UnregisterEvent("SPELL_UPDATE_COOLDOWN")
+        resourceAwareEventFrame:UnregisterEvent("SPELL_UPDATE_USABLE")
+        resourceAwareEventFrame:UnregisterEvent("UNIT_POWER_FREQUENT")
     end
 end
 
-local OnSpellEvent
+local function RegisterResourceAwareCdID(cdID)
+    if resourceAwareCdIDs[cdID] then return end
+    resourceAwareCdIDs[cdID] = true
+    resourceAwareCount = resourceAwareCount + 1
+    if resourceAwareCount == 1 then
+        RefreshResourceAwareEventRegistration()
+    end
+end
+
+local function UnregisterResourceAwareCdID(cdID)
+    if not resourceAwareCdIDs[cdID] then return end
+    resourceAwareCdIDs[cdID] = nil
+    resourceAwareCount = resourceAwareCount - 1
+    if resourceAwareCount <= 0 then
+        resourceAwareCount = 0
+        RefreshResourceAwareEventRegistration()
+    end
+end
 
 local function HasChargeSource(frame)
     return frame.HasVisualDataSource_Charges and frame:HasVisualDataSource_Charges() or false
 end
 
-local function ComputeFrameReady(frame, spellID)
-    if not usableBySpellID[spellID] then return false end
-    local s = CDM.GetSpellWatchState(spellID)
-    if not s then return false end
+local function ComputeCooldownReady(frame, spellID)
     local ci = GetSpellCharges(spellID)
     if ci and ci.maxCharges and ci.maxCharges > 1 then
         if not ci.isActive then return true end
         return HasChargeSource(frame)
     end
-    return (not s.isActive) or s.isOnGCD
+
+    local info = C_Spell_GetSpellCooldown(spellID)
+    if not info then return false end
+    return (not info.isActive) or info.isOnGCD
 end
 
-local function FanoutToFrames(cdID)
+local function ComputeFrameReady(frame, spellID, entry)
+    if not ComputeCooldownReady(frame, spellID) then return false end
+    if entry and entry.readyGlowResourceAware then
+        return C_Spell_IsSpellUsable(spellID) == true
+    end
+    return true
+end
+
+FanoutToFrames = function(cdID)
     local frames = framesByCdID[cdID]
     if not frames then return end
     local sync = CDM.SyncReadyGlowForFrame
@@ -59,39 +96,63 @@ local function FanoutToFrames(cdID)
     local entry = map and map[cdID] or nil
     local spellID = spellIDByCdID[cdID]
     for frame in pairs(frames) do
-        sync(frame, entry, spellID, ComputeFrameReady(frame, spellID))
+        if frame.cdmGlowDirectorCdID == cdID and frame.cooldownID == cdID then
+            sync(frame, entry, spellID, ComputeFrameReady(frame, spellID, entry))
+        end
     end
 end
+
+local function RequestFanout(cdID)
+    if resourceAwareCdIDs[cdID] then
+        QueueResourceAwareRefresh()
+    else
+        FanoutToFrames(cdID)
+    end
+end
+
+local function WireCooldownDone(frame)
+    if frame.cdmReadyGlowCooldownDoneHooked then return end
+
+    local cooldown = frame.cd or frame.Cooldown
+    if not cooldown or not cooldown.HookScript then return end
+
+    frame.cdmReadyGlowCooldownDoneHooked = true
+    cooldown:HookScript("OnCooldownDone", function()
+        C_Timer_After(0, function()
+            local cdID = frame.cdmGlowDirectorCdID
+            if cdID and frame.cooldownID == cdID then
+                RequestFanout(cdID)
+            end
+        end)
+    end)
+end
+
+QueueResourceAwareRefresh = function()
+    if resourceAwareRefreshPending or resourceAwareCount == 0 then return end
+    resourceAwareRefreshPending = true
+    resourceAwareEventFrame:Show()
+end
+
+resourceAwareEventFrame:SetScript("OnUpdate", function(self)
+    self:Hide()
+    resourceAwareRefreshPending = false
+    for cdID in pairs(resourceAwareCdIDs) do
+        FanoutToFrames(cdID)
+    end
+end)
+
+resourceAwareEventFrame:SetScript("OnEvent", function()
+    QueueResourceAwareRefresh()
+end)
 
 OnSpellEvent = function(spellID, cooldownsChanged, chargesChanged)
     if not (cooldownsChanged or chargesChanged) then return end
     local cdIDs = cdIDsBySpellID[spellID]
     if not cdIDs then return end
     for cdID in pairs(cdIDs) do
-        FanoutToFrames(cdID)
+        RequestFanout(cdID)
     end
 end
-
-local function HandleUsableEvent()
-    for spellID, prev in pairs(usableBySpellID) do
-        local usable = C_Spell_IsSpellUsable(spellID) and true or false
-        if prev ~= usable then
-            usableBySpellID[spellID] = usable
-            local cdIDs = cdIDsBySpellID[spellID]
-            if cdIDs then
-                for cdID in pairs(cdIDs) do
-                    FanoutToFrames(cdID)
-                end
-            end
-        end
-    end
-end
-
-usableEventFrame:SetScript("OnEvent", function(_, event)
-    if event == "SPELL_UPDATE_USABLE" then
-        HandleUsableEvent()
-    end
-end)
 
 local function WatchCdIDForSpell(cdID, spellID)
     spellIDByCdID[cdID] = spellID
@@ -99,16 +160,17 @@ local function WatchCdIDForSpell(cdID, spellID)
     if not set then
         set = {}
         cdIDsBySpellID[spellID] = set
-        usableBySpellID[spellID] = C_Spell_IsSpellUsable(spellID) and true or false
-        watchedSpellCount = watchedSpellCount + 1
-        if watchedSpellCount == 1 then
-            RefreshUsableEventRegistration()
-        end
         if CDM.WatchSpell then
             CDM.WatchSpell(OWNER_KEY, spellID, OnSpellEvent)
         end
     end
     set[cdID] = true
+
+    local map = CDM._auraOverlayEnabled
+    local entry = map and map[cdID] or nil
+    if entry and entry.readyGlowResourceAware then
+        RegisterResourceAwareCdID(cdID)
+    end
 end
 
 local function UnwatchCdIDFromSpell(cdID)
@@ -120,11 +182,6 @@ local function UnwatchCdIDFromSpell(cdID)
         set[cdID] = nil
         if not next(set) then
             cdIDsBySpellID[spellID] = nil
-            usableBySpellID[spellID] = nil
-            watchedSpellCount = watchedSpellCount - 1
-            if watchedSpellCount == 0 then
-                RefreshUsableEventRegistration()
-            end
             if CDM.UnwatchSpell then
                 CDM.UnwatchSpell(OWNER_KEY, spellID)
             end
@@ -134,6 +191,7 @@ end
 
 local function UnregisterCdID(cdID)
     framesByCdID[cdID] = nil
+    UnregisterResourceAwareCdID(cdID)
     UnwatchCdIDFromSpell(cdID)
 end
 
@@ -172,7 +230,8 @@ function GlowDirector:OnCooldownIDSet(frame)
     set[frame] = true
     frame.cdmGlowDirectorCdID = cdID
 
-    FanoutToFrames(cdID)
+    WireCooldownDone(frame)
+    RequestFanout(cdID)
 end
 
 function GlowDirector:OnCooldownIDCleared(frame)
@@ -185,7 +244,8 @@ end
 
 function GlowDirector:InstallAcquireResetHook(v)
     hooksecurefunc(v, "OnAcquireItemFrame", function(_, itemFrame)
-        itemFrame.cdmGlowDirectorCdID = nil
+        -- Keep the previous registration until SetCooldownID/ClearCooldownID can remove it.
+        -- Clearing it here leaves recycled frames registered under an old cooldownID.
         if itemFrame.cdmGlowLifecycleHooked then return end
         itemFrame.cdmGlowLifecycleHooked = true
 
@@ -222,16 +282,22 @@ function GlowDirector:RefreshFrame(frame)
     end
 
     local spellID = spellIDByCdID[cdID]
-    sync(frame, entry, spellID, ComputeFrameReady(frame, spellID))
+    if resourceAwareCdIDs[cdID] then
+        QueueResourceAwareRefresh()
+        return
+    end
+    sync(frame, entry, spellID, ComputeFrameReady(frame, spellID, entry))
 end
 
 function GlowDirector:RebuildIndex()
     wipe(framesByCdID)
     wipe(spellIDByCdID)
     wipe(cdIDsBySpellID)
-    wipe(usableBySpellID)
-    watchedSpellCount = 0
-    RefreshUsableEventRegistration()
+    wipe(resourceAwareCdIDs)
+    resourceAwareCount = 0
+    resourceAwareRefreshPending = false
+    resourceAwareEventFrame:Hide()
+    RefreshResourceAwareEventRegistration()
     if CDM.UnwatchAllSpells then
         CDM.UnwatchAllSpells(OWNER_KEY)
     end
