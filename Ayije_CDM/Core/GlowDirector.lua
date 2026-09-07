@@ -18,7 +18,9 @@ local spellIDByCdID = {}
 local cdIDsBySpellID = {}
 
 local GetSpellCharges = C_Spell.GetSpellCharges
+local C_Spell_GetSpellCooldown = C_Spell.GetSpellCooldown
 local C_Spell_IsSpellUsable = C_Spell.IsSpellUsable
+local C_Timer_After = C_Timer.After
 
 local resourceAwareEventFrame = CreateFrame("Frame")
 resourceAwareEventFrame:Hide()
@@ -66,14 +68,15 @@ local function HasChargeSource(frame)
 end
 
 local function ComputeCooldownReady(frame, spellID)
-    local s = CDM.GetSpellWatchState(spellID)
-    if not s then return false end
     local ci = GetSpellCharges(spellID)
     if ci and ci.maxCharges and ci.maxCharges > 1 then
         if not ci.isActive then return true end
         return HasChargeSource(frame)
     end
-    return (not s.isActive) or s.isOnGCD
+
+    local info = C_Spell_GetSpellCooldown(spellID)
+    if not info then return false end
+    return (not info.isActive) or info.isOnGCD
 end
 
 local function ComputeFrameReady(frame, spellID, entry)
@@ -105,6 +108,23 @@ local function RequestFanout(cdID)
     else
         FanoutToFrames(cdID)
     end
+end
+
+local function WireCooldownDone(frame)
+    if frame.cdmReadyGlowCooldownDoneHooked then return end
+
+    local cooldown = frame.cd or frame.Cooldown
+    if not cooldown or not cooldown.HookScript then return end
+
+    frame.cdmReadyGlowCooldownDoneHooked = true
+    cooldown:HookScript("OnCooldownDone", function()
+        C_Timer_After(0, function()
+            local cdID = frame.cdmGlowDirectorCdID
+            if cdID and frame.cooldownID == cdID then
+                RequestFanout(cdID)
+            end
+        end)
+    end)
 end
 
 QueueResourceAwareRefresh = function()
@@ -210,6 +230,7 @@ function GlowDirector:OnCooldownIDSet(frame)
     set[frame] = true
     frame.cdmGlowDirectorCdID = cdID
 
+    WireCooldownDone(frame)
     RequestFanout(cdID)
 end
 
