@@ -1,0 +1,16 @@
+## Title: |cFF3bb273Ayije_CDM|r
+# LOCAL STANDALONE COPY - distribution project IDs removed
+## Notes: Cooldown Manager
+## Author: Ayije
+## Version: 3.88
+## Interface: 120005, 120007
+## DefaultState: enabled
+## SavedVariables: Ayije_CDMDB
+
+Libs\embeds.xml
+Init.lua
+Locales\embeds.xml
+Core\embeds.xml
+Config\embeds.xml
+Modules\embeds.xml
+Core\Main.lua

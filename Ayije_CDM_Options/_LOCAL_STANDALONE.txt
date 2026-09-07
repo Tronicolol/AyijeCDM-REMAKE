@@ -1,0 +1,4 @@
+LOCAL STANDALONE COPY
+Installed manually in Interface\AddOns.
+Distribution project identifiers were removed from TOC metadata.
+This file is not loaded by World of Warcraft.
