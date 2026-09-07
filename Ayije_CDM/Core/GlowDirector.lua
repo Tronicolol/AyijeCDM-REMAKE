@@ -34,6 +34,11 @@ end
 
 local OnSpellEvent
 
+local function IsSpellConditionReady(spellID)
+    local isUsable, insufficientPower = C_Spell_IsSpellUsable(spellID)
+    return (isUsable or insufficientPower) and true or false
+end
+
 local function HasChargeSource(frame)
     return frame.HasVisualDataSource_Charges and frame:HasVisualDataSource_Charges() or false
 end
@@ -76,7 +81,7 @@ end
 
 local function HandleUsableEvent()
     for spellID, prev in pairs(usableBySpellID) do
-        local usable = C_Spell_IsSpellUsable(spellID) and true or false
+        local usable = IsSpellConditionReady(spellID)
         if prev ~= usable then
             usableBySpellID[spellID] = usable
             local cdIDs = cdIDsBySpellID[spellID]
@@ -101,7 +106,7 @@ local function WatchCdIDForSpell(cdID, spellID)
     if not set then
         set = {}
         cdIDsBySpellID[spellID] = set
-        usableBySpellID[spellID] = C_Spell_IsSpellUsable(spellID) and true or false
+        usableBySpellID[spellID] = IsSpellConditionReady(spellID)
         watchedSpellCount = watchedSpellCount + 1
         if watchedSpellCount == 1 then
             RefreshUsableEventRegistration()
