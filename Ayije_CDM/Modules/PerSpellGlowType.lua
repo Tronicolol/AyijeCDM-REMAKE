@@ -8,7 +8,9 @@ local LCG = LibStub("LibCustomGlow-1.0", true)
 if not VIEWERS or not LCG then return end
 
 local originalRequestBuffGlow = Glow.RequestBuffGlow
-if type(originalRequestBuffGlow) ~= "function" then return end
+local originalStopGlow = Glow.StopGlow
+local originalInstallAcquireResetHook = Glow.InstallAcquireResetHook
+if type(originalRequestBuffGlow) ~= "function" or type(originalStopGlow) ~= "function" then return end
 
 local GLOW_KEY = "CDM_SpellAlert"
 local PROC_GLOW_FIELD = "_ProcGlow" .. GLOW_KEY
@@ -26,6 +28,9 @@ local VALID_GLOW_TYPES = {
     button = true,
     proc = true,
 }
+
+local customStates = setmetatable({}, { __mode = "k" })
+local pendingDisableGeneration = setmetatable({}, { __mode = "k" })
 
 local function IsManagedCooldownFrame(frame)
     if not frame then return false end
@@ -185,7 +190,7 @@ local function StopGlowByType(host, glowType)
     end
 end
 
-local function StartGlowByType(host, glowType, overrideColor)
+local function StartOrUpdateGlowByType(host, glowType, overrideColor)
     local color = GetGlowColor(overrideColor)
     local frameLevel = 5
 
@@ -241,6 +246,19 @@ local function ColorsMatch(a, b)
     return a.r == b.r and a.g == b.g and a.b == b.b and (a.a or 1) == (b.a or 1)
 end
 
+local function EnsureHost(frame)
+    local host = frame.cdmBuffGlowHost
+    if host then return host end
+
+    host = CreateFrame("Frame", nil, frame)
+    host:SetClampedToScreen(false)
+    frame.cdmBuffGlowHost = host
+    frame.cdmBuffGlowHostAnchorTarget = nil
+    frame.cdmBuffGlowHostStrata = nil
+    frame.cdmBuffGlowHostLevel = nil
+    return host
+end
+
 local function SyncHost(frame, host)
     if not frame or not host then return end
 
@@ -265,6 +283,41 @@ local function SyncHost(frame, host)
     end
 end
 
+local function DoesGlowSourceMatchID(sourceID, sourceBase, id)
+    if not sourceID or not id then return false end
+    if id == sourceID or id == sourceBase then
+        return true
+    end
+
+    local base = CDM.NormalizeToBase and CDM.NormalizeToBase(id)
+    return base == sourceID or base == sourceBase
+end
+
+local function IsSourceStillValid(frame, sourceID)
+    if not sourceID then return true end
+    if not CDM.GetCurrentSpecID or not CDM.GetSpellGlowEnabled then return true end
+
+    local specID = CDM:GetCurrentSpecID()
+    if not specID or not CDM:GetSpellGlowEnabled(specID, sourceID) then
+        return false
+    end
+
+    local sourceBase = CDM.NormalizeToBase and CDM.NormalizeToBase(sourceID) or sourceID
+    if DoesGlowSourceMatchID(sourceID, sourceBase, frame.cdmBuffCategorySpellID) then
+        return true
+    end
+
+    if CDM.GetSpellIDCandidates then
+        for _, id in ipairs(CDM:GetSpellIDCandidates(frame)) do
+            if DoesGlowSourceMatchID(sourceID, sourceBase, id) then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
 local function CanTakeProducer(frame, producerToken)
     local current = frame.cdmGlowProducer
     if not current or current == producerToken then return true end
@@ -278,92 +331,252 @@ local function CanTakeProducer(frame, producerToken)
     return true
 end
 
-local function ApplyGlowTypeOverride(frame, glowType)
-    if not glowType then return end
+local function StopCustomState(frame, state)
+    if not state then return end
+
+    pendingDisableGeneration[frame] = nil
 
     local host = frame.cdmBuffGlowHost
-    if not host or not frame:IsShown() or not host.cdmGlowActive then return end
-
-    local overrideColor = frame.cdmBuffGlowOverrideColor
-    if host.cdmGlowType == glowType
-       and host.cdmGlowOverrideType == glowType
-       and ColorsMatch(host.cdmGlowOverrideColor, overrideColor) then
-        return
+    if host and host.cdmGlowActive then
+        StopGlowByType(host, host.cdmGlowType)
+        host.cdmGlowActive = false
+        host.cdmGlowType = nil
+        host.cdmGlowOverrideType = nil
+        host.cdmGlowOverrideColor = nil
+        host:Hide()
+    elseif host then
+        host:Hide()
     end
 
-    StopGlowByType(host, host.cdmGlowType)
-    host.cdmGlowActive = false
-    host.cdmGlowType = nil
-    host.cdmGlowOverrideType = nil
-
-    StartGlowByType(host, glowType, overrideColor)
-    host.cdmGlowActive = true
-    host.cdmGlowType = glowType
-    host.cdmGlowOverrideType = glowType
-    host.cdmGlowOverrideColor = overrideColor
+    frame.cdmGlowProducer = nil
+    frame.cdmBuffGlowWanted = nil
+    frame.cdmBuffGlowOverrideColor = nil
+    frame.cdmBuffGlowSourceID = nil
+    customStates[frame] = nil
 end
 
-local function EnsureFrameShowHook(frame)
-    if frame.cdmPerSpellGlowTypeShowHooked then return end
-    frame.cdmPerSpellGlowTypeShowHooked = true
+local function ApplyCustomVisual(frame, state, glowType, overrideColor, forceUpdate)
+    local host = EnsureHost(frame)
+    SyncHost(frame, host)
+
+    local sameType = host.cdmGlowActive
+        and host.cdmGlowType == glowType
+        and host.cdmGlowOverrideType == glowType
+
+    if sameType then
+        if forceUpdate or not ColorsMatch(host.cdmGlowOverrideColor, overrideColor) then
+            StartOrUpdateGlowByType(host, glowType, overrideColor)
+            host.cdmGlowOverrideColor = overrideColor
+        end
+    else
+        if host.cdmGlowActive then
+            StopGlowByType(host, host.cdmGlowType)
+        end
+
+        StartOrUpdateGlowByType(host, glowType, overrideColor)
+        host.cdmGlowActive = true
+        host.cdmGlowType = glowType
+        host.cdmGlowOverrideType = glowType
+        host.cdmGlowOverrideColor = overrideColor
+    end
+
+    state.glowType = glowType
+    state.overrideColor = overrideColor
+
+    if frame:IsShown() then
+        host:Show()
+    else
+        host:Hide()
+    end
+end
+
+local function EnsureFrameHooks(frame)
+    if frame.cdmPerSpellGlowLifecycleHooked then return end
+    frame.cdmPerSpellGlowLifecycleHooked = true
 
     frame:HookScript("OnShow", function(self)
-        if not self.cdmBuffGlowWanted or not self.cdmGlowProducer then return end
+        local currentState = customStates[self]
+        if not currentState or not self.cdmGlowProducer then return end
+        if not IsSourceStillValid(self, self.cdmBuffGlowSourceID) then
+            StopCustomState(self, currentState)
+            return
+        end
+
         local glowType = GetSpellGlowTypeOverride(self)
-        if glowType then
-            ApplyGlowTypeOverride(self, glowType)
+        if not glowType then return end
+
+        local host = EnsureHost(self)
+        SyncHost(self, host)
+
+        if not host.cdmGlowActive then
+            ApplyCustomVisual(self, currentState, glowType, self.cdmBuffGlowOverrideColor, false)
+        else
+            host:Show()
         end
     end)
+
+    frame:HookScript("OnSizeChanged", function(self)
+        local currentState = customStates[self]
+        if not currentState or not self.cdmGlowProducer then return end
+
+        local host = self.cdmBuffGlowHost
+        if host then
+            SyncHost(self, host)
+        end
+    end)
+end
+
+local function CancelPendingDisable(frame)
+    if pendingDisableGeneration[frame] then
+        pendingDisableGeneration[frame] = pendingDisableGeneration[frame] + 1
+    end
+end
+
+local function ScheduleDisableResolution(frame)
+    local generation = (pendingDisableGeneration[frame] or 0) + 1
+    pendingDisableGeneration[frame] = generation
+
+    C_Timer.After(0, function()
+        if pendingDisableGeneration[frame] ~= generation then return end
+        pendingDisableGeneration[frame] = nil
+
+        local state = customStates[frame]
+        if not state or frame.cdmGlowProducer then return end
+
+        if frame:IsShown() and CDM.RefreshFrameVisuals then
+            CDM:RefreshFrameVisuals(frame)
+        end
+
+        if customStates[frame] == state and not frame.cdmGlowProducer then
+            StopCustomState(frame, state)
+        end
+    end)
+end
+
+local function TransitionBackToGlobal(frame, state)
+    if not state then return end
+
+    local producerToken = frame.cdmGlowProducer
+    local overrideColor = frame.cdmBuffGlowOverrideColor
+    local sourceID = frame.cdmBuffGlowSourceID
+
+    pendingDisableGeneration[frame] = nil
+    customStates[frame] = nil
+
+    frame.cdmGlowProducer = nil
+    frame.cdmBuffGlowWanted = nil
+    frame.cdmBuffGlowOverrideColor = nil
+    frame.cdmBuffGlowSourceID = nil
+
+    if producerToken then
+        originalRequestBuffGlow(Glow, frame, producerToken, true, overrideColor, sourceID)
+    else
+        local host = frame.cdmBuffGlowHost
+        if host and host.cdmGlowActive then
+            StopGlowByType(host, host.cdmGlowType)
+            host.cdmGlowActive = false
+            host.cdmGlowType = nil
+            host.cdmGlowOverrideType = nil
+            host.cdmGlowOverrideColor = nil
+            host:Hide()
+        end
+    end
 end
 
 Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideColor, sourceID)
     if not frame then return end
 
-    local glowType = enabled and GetSpellGlowTypeOverride(frame) or nil
-    if not enabled or not glowType then
-        originalRequestBuffGlow(self, frame, producerToken, enabled, overrideColor, sourceID)
+    local state = customStates[frame]
+    local glowType = GetSpellGlowTypeOverride(frame)
+
+    if not enabled then
+        if state then
+            if frame.cdmGlowProducer ~= producerToken then return end
+
+            frame.cdmGlowProducer = nil
+            frame.cdmBuffGlowWanted = nil
+            frame.cdmBuffGlowOverrideColor = nil
+            frame.cdmBuffGlowSourceID = nil
+            ScheduleDisableResolution(frame)
+            return
+        end
+
+        originalRequestBuffGlow(self, frame, producerToken, false, overrideColor, sourceID)
+        return
+    end
+
+    if not glowType then
+        if state then
+            TransitionBackToGlobal(frame, state)
+        end
+        originalRequestBuffGlow(self, frame, producerToken, true, overrideColor, sourceID)
         return
     end
 
     if not CanTakeProducer(frame, producerToken) then return end
 
-    local host = frame.cdmBuffGlowHost
-    local needsCoreStart = not host or not host.cdmGlowActive
+    CancelPendingDisable(frame)
 
-    if needsCoreStart then
-        originalRequestBuffGlow(self, frame, producerToken, true, overrideColor, sourceID)
-        if frame.cdmGlowProducer ~= producerToken or not frame.cdmBuffGlowWanted then return end
-        host = frame.cdmBuffGlowHost
-    else
-        frame.cdmGlowProducer = producerToken
-        frame.cdmBuffGlowWanted = true
-        frame.cdmBuffGlowOverrideColor = overrideColor
-        frame.cdmBuffGlowSourceID = sourceID
+    if not state then
+        state = {}
+        customStates[frame] = state
     end
 
-    if not host then return end
+    EnsureFrameHooks(frame)
 
-    EnsureFrameShowHook(frame)
-    SyncHost(frame, host)
+    frame.cdmGlowProducer = producerToken
+    frame.cdmBuffGlowWanted = nil
+    frame.cdmBuffGlowOverrideColor = overrideColor
+    frame.cdmBuffGlowSourceID = sourceID
 
-    if frame:IsShown() then
-        host:Show()
-        ApplyGlowTypeOverride(frame, glowType)
+    ApplyCustomVisual(frame, state, glowType, overrideColor, false)
+end
+
+Glow.StopGlow = function(self, frame)
+    local state = frame and customStates[frame]
+    if state then
+        StopCustomState(frame, state)
+    end
+    originalStopGlow(self, frame)
+end
+
+if type(originalInstallAcquireResetHook) == "function" then
+    Glow.InstallAcquireResetHook = function(self, viewer)
+        originalInstallAcquireResetHook(self, viewer)
+
+        hooksecurefunc(viewer, "OnAcquireItemFrame", function(_, itemFrame)
+            local state = customStates[itemFrame]
+            if state then
+                StopCustomState(itemFrame, state)
+            end
+        end)
     end
 end
 
-function Glow:RefreshSpellGlowTypeOverrides()
+function Glow:RefreshSpellGlowTypeOverrides(forceUpdate)
     if not CDM.ForEachActiveFrame then return end
 
     CDM:ForEachActiveFrame({ VIEWERS.ESSENTIAL, VIEWERS.UTILITY }, function(frame)
-        if not frame.cdmBuffGlowWanted or not frame.cdmGlowProducer then return end
+        local state = customStates[frame]
+        local glowType = GetSpellGlowTypeOverride(frame)
 
-        self:RequestBuffGlow(
+        if state and not glowType then
+            TransitionBackToGlobal(frame, state)
+            return
+        end
+
+        if not state or not glowType or not frame.cdmGlowProducer then return end
+
+        ApplyCustomVisual(
             frame,
-            frame.cdmGlowProducer,
-            true,
+            state,
+            glowType,
             frame.cdmBuffGlowOverrideColor,
-            frame.cdmBuffGlowSourceID
+            forceUpdate == true
         )
     end)
 end
+
+CDM:RegisterRefreshCallback("perSpellGlowType", function()
+    Glow:RefreshSpellGlowTypeOverrides(true)
+end, 55, { "STYLE" })
