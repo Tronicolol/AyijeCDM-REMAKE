@@ -13,6 +13,13 @@ if type(originalRequestBuffGlow) ~= "function" then return end
 local GLOW_KEY = "CDM_SpellAlert"
 local PROC_GLOW_FIELD = "_ProcGlow" .. GLOW_KEY
 
+local PRODUCER_PRIORITY = {
+    alert = 1,
+    aura = 2,
+    buff = 2,
+    ready = 3,
+}
+
 local VALID_GLOW_TYPES = {
     pixel = true,
     autocast = true,
@@ -234,6 +241,43 @@ local function ColorsMatch(a, b)
     return a.r == b.r and a.g == b.g and a.b == b.b and (a.a or 1) == (b.a or 1)
 end
 
+local function SyncHost(frame, host)
+    if not frame or not host then return end
+
+    if frame.cdmBuffGlowHostAnchorTarget ~= frame then
+        host:SetParent(frame)
+        host:ClearAllPoints()
+        host:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+        host:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+        frame.cdmBuffGlowHostAnchorTarget = frame
+    end
+
+    local strata = frame:GetFrameStrata()
+    if strata and frame.cdmBuffGlowHostStrata ~= strata then
+        host:SetFrameStrata(strata)
+        frame.cdmBuffGlowHostStrata = strata
+    end
+
+    local level = frame:GetFrameLevel()
+    if level and frame.cdmBuffGlowHostLevel ~= level then
+        host:SetFrameLevel(level)
+        frame.cdmBuffGlowHostLevel = level
+    end
+end
+
+local function CanTakeProducer(frame, producerToken)
+    local current = frame.cdmGlowProducer
+    if not current or current == producerToken then return true end
+
+    local currentPri = PRODUCER_PRIORITY[current]
+    local requestPri = PRODUCER_PRIORITY[producerToken]
+    if currentPri and requestPri and currentPri < requestPri then
+        return false
+    end
+
+    return true
+end
+
 local function ApplyGlowTypeOverride(frame, glowType)
     if not glowType then return end
 
@@ -241,15 +285,16 @@ local function ApplyGlowTypeOverride(frame, glowType)
     if not host or not frame:IsShown() or not host.cdmGlowActive then return end
 
     local overrideColor = frame.cdmBuffGlowOverrideColor
-    if host.cdmGlowType == glowType then
-        host.cdmGlowOverrideType = glowType
-        host.cdmGlowOverrideColor = overrideColor
+    if host.cdmGlowType == glowType
+       and host.cdmGlowOverrideType == glowType
+       and ColorsMatch(host.cdmGlowOverrideColor, overrideColor) then
         return
     end
 
     StopGlowByType(host, host.cdmGlowType)
     host.cdmGlowActive = false
     host.cdmGlowType = nil
+    host.cdmGlowOverrideType = nil
 
     StartGlowByType(host, glowType, overrideColor)
     host.cdmGlowActive = true
@@ -275,28 +320,36 @@ Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideCol
     if not frame then return end
 
     local glowType = enabled and GetSpellGlowTypeOverride(frame) or nil
-    local host = frame.cdmBuffGlowHost
-
-    if enabled and glowType
-       and frame.cdmGlowProducer == producerToken
-       and frame.cdmBuffGlowWanted
-       and host and host.cdmGlowActive
-       and host.cdmGlowOverrideType == glowType
-       and ColorsMatch(host.cdmGlowOverrideColor, overrideColor)
-       and frame.cdmBuffGlowSourceID == sourceID then
-        frame.cdmBuffGlowOverrideColor = overrideColor
-        frame.cdmBuffGlowSourceID = sourceID
-        host.cdmGlowOverrideColor = overrideColor
+    if not enabled or not glowType then
+        originalRequestBuffGlow(self, frame, producerToken, enabled, overrideColor, sourceID)
         return
     end
 
-    originalRequestBuffGlow(self, frame, producerToken, enabled, overrideColor, sourceID)
+    if not CanTakeProducer(frame, producerToken) then return end
 
-    if not enabled or not glowType then return end
-    if frame.cdmGlowProducer ~= producerToken or not frame.cdmBuffGlowWanted then return end
+    local host = frame.cdmBuffGlowHost
+    local needsCoreStart = not host or not host.cdmGlowActive
+
+    if needsCoreStart then
+        originalRequestBuffGlow(self, frame, producerToken, true, overrideColor, sourceID)
+        if frame.cdmGlowProducer ~= producerToken or not frame.cdmBuffGlowWanted then return end
+        host = frame.cdmBuffGlowHost
+    else
+        frame.cdmGlowProducer = producerToken
+        frame.cdmBuffGlowWanted = true
+        frame.cdmBuffGlowOverrideColor = overrideColor
+        frame.cdmBuffGlowSourceID = sourceID
+    end
+
+    if not host then return end
 
     EnsureFrameShowHook(frame)
-    ApplyGlowTypeOverride(frame, glowType)
+    SyncHost(frame, host)
+
+    if frame:IsShown() then
+        host:Show()
+        ApplyGlowTypeOverride(frame, glowType)
+    end
 end
 
 function Glow:RefreshSpellGlowTypeOverrides()
@@ -305,24 +358,7 @@ function Glow:RefreshSpellGlowTypeOverrides()
     CDM:ForEachActiveFrame({ VIEWERS.ESSENTIAL, VIEWERS.UTILITY }, function(frame)
         if not frame.cdmBuffGlowWanted or not frame.cdmGlowProducer then return end
 
-        local glowType = GetSpellGlowTypeOverride(frame)
-        local host = frame.cdmBuffGlowHost
-
-        if glowType then
-            EnsureFrameShowHook(frame)
-            ApplyGlowTypeOverride(frame, glowType)
-            return
-        end
-
-        if not host or not host.cdmGlowOverrideType then return end
-
-        if not frame:IsShown() then
-            host.cdmGlowOverrideType = nil
-            return
-        end
-
-        originalRequestBuffGlow(
-            self,
+        self:RequestBuffGlow(
             frame,
             frame.cdmGlowProducer,
             true,
