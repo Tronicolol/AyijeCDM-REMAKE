@@ -15,6 +15,30 @@ if type(originalRequestBuffGlow) ~= "function" or type(originalInstallAcquireRes
 
 local refreshGeneration = setmetatable({}, { __mode = "k" })
 
+local function IsManagedCooldownFrame(frame)
+    if not frame then return false end
+
+    local viewer
+    if frame.GetViewerFrame then
+        viewer = frame:GetViewerFrame()
+    end
+
+    if viewer == _G[VIEWERS.ESSENTIAL] or viewer == _G[VIEWERS.UTILITY] then
+        return true
+    end
+
+    local parent = frame:GetParent()
+    while parent do
+        local name = parent:GetName()
+        if name == VIEWERS.ESSENTIAL or name == VIEWERS.UTILITY then
+            return true
+        end
+        parent = parent:GetParent()
+    end
+
+    return false
+end
+
 local function CancelQueuedRefresh(frame)
     refreshGeneration[frame] = (refreshGeneration[frame] or 0) + 1
 end
@@ -67,16 +91,20 @@ local function ValidateBinding(frame, queueRefresh)
 end
 
 local function EnsureFrameLifecycleHooks(frame)
-    if not frame or frame.cdmGlowFrameLifecycleHooked then return end
+    if not IsManagedCooldownFrame(frame) or frame.cdmGlowFrameLifecycleHooked then return end
     frame.cdmGlowFrameLifecycleHooked = true
 
-    hooksecurefunc(frame, "SetCooldownID", function(self)
-        ValidateBinding(self, true)
-    end)
+    if type(frame.SetCooldownID) == "function" then
+        hooksecurefunc(frame, "SetCooldownID", function(self)
+            ValidateBinding(self, true)
+        end)
+    end
 
-    hooksecurefunc(frame, "ClearCooldownID", function(self)
-        ValidateBinding(self, false)
-    end)
+    if type(frame.ClearCooldownID) == "function" then
+        hooksecurefunc(frame, "ClearCooldownID", function(self)
+            ValidateBinding(self, false)
+        end)
+    end
 
     frame:HookScript("OnShow", function(self)
         ValidateBinding(self, true)
@@ -84,7 +112,7 @@ local function EnsureFrameLifecycleHooks(frame)
 end
 
 Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideColor, sourceID)
-    if frame then
+    if IsManagedCooldownFrame(frame) then
         EnsureFrameLifecycleHooks(frame)
         ValidateBinding(frame, false)
     end
@@ -96,6 +124,8 @@ Glow.InstallAcquireResetHook = function(self, viewer)
     originalInstallAcquireResetHook(self, viewer)
 
     hooksecurefunc(viewer, "OnAcquireItemFrame", function(_, itemFrame)
+        if not IsManagedCooldownFrame(itemFrame) then return end
+
         EnsureFrameLifecycleHooks(itemFrame)
         CancelQueuedRefresh(itemFrame)
         itemFrame.cdmGlowLifecycleBindingInitialized = true
