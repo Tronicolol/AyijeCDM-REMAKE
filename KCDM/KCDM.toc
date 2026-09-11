@@ -5,7 +5,6 @@
 ## Interface: 120005, 120007
 ## DefaultState: enabled
 ## SavedVariables: KCDMDB
-## OptionalDeps: Ayije_CDM
 
 Libs\embeds.xml
 Init.lua
