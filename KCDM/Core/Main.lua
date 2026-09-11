@@ -465,9 +465,9 @@ local function RegisterRefreshCallbacks()
 end
 
 function CDM:OnEnable()
-    SLASH_AYIJECDM1 = "/kcdm"
-    SLASH_AYIJECDM2 = "/cdm"
-    SlashCmdList["AYIJECDM"] = function()
+    SLASH_KCDM1 = "/kcdm"
+    SLASH_KCDM2 = "/cdm"
+    SlashCmdList["KCDM"] = function()
         CDM:RequestConfigOpen("slash", nil)
     end
 
