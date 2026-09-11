@@ -1,11 +1,5 @@
 local AddonName = "KCDM"
 
--- Temporary one-time compatibility for the KCDM rename.
--- KCDMDB always wins once it exists.
-if KCDMDB == nil and _G.Ayije_CDMDB ~= nil then
-    KCDMDB = _G.Ayije_CDMDB
-end
-
 local CDM = CreateFrame("Frame")
 CDM.eventHandlers = {}
 
