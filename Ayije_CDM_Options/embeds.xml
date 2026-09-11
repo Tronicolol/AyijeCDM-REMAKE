@@ -25,6 +25,7 @@
     <Script file="EditModeOverlay.lua"/>
     <Script file="Trinkets.lua"/>
     <Script file="Resources_Conditions.lua"/>
+    <Script file="WhirlwindResourceOptions.lua"/>
     <Script file="Resources_Load.lua"/>
     <Script file="Resources.lua"/>
     <Script file="Bars.lua"/>
