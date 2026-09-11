@@ -1,0 +1,50 @@
+name: One-shot KCDM cleanup
+
+on:
+  push:
+    branches:
+      - refactor-kcdm
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove final legacy identifiers
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for base in [Path('KCDM'), Path('KCDM_Options')]:
+              for p in base.rglob('*'):
+                  if not p.is_file() or 'Libs' in p.parts or p.name == 'LICENSE':
+                      continue
+                  if p.suffix.lower() not in {'.lua','.xml','.toc','.md','.txt','.json'}:
+                      continue
+                  text = p.read_text(encoding='utf-8-sig')
+                  text = text.replace('AYIJECDM', 'KCDM')
+                  p.write_text(text, encoding='utf-8')
+
+          unexpected = []
+          for base in [Path('KCDM'), Path('KCDM_Options')]:
+              for p in base.rglob('*'):
+                  if not p.is_file() or 'Libs' in p.parts or p.name == 'LICENSE':
+                      continue
+                  if p.suffix.lower() not in {'.lua','.xml','.toc','.md','.txt','.json'}:
+                      continue
+                  text = p.read_text(encoding='utf-8-sig')
+                  if any(token in text for token in ('Ayije', 'AYIJE', 'ayije')):
+                      if p not in {Path('KCDM/Init.lua'), Path('KCDM/KCDM.toc')}:
+                          unexpected.append(str(p))
+          if unexpected:
+              raise RuntimeError('Unexpected legacy identity references: ' + ', '.join(unexpected))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add KCDM KCDM_Options
+          git commit -m "Remove remaining legacy KCDM identifiers"
+          git push origin HEAD:refactor-kcdm
