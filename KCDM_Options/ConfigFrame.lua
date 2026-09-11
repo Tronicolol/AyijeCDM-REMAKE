@@ -71,7 +71,6 @@ local function HideConfigPopups()
         return
     end
 
-    StaticPopup_Hide("KCDM_COPY_URL")
     StaticPopup_Hide("KCDM_CONFIRM_RESET_PROFILE")
     StaticPopup_Hide("KCDM_CONFIRM_COPY_PROFILE")
     StaticPopup_Hide("KCDM_CONFIRM_DELETE_PROFILE")
@@ -247,36 +246,6 @@ local function CreateConfigFrame()
     panelBg:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 17, -64)
 
     local gold = CDM_C.GOLD
-
-    local function CreateSocialButton(parent, iconTexPath, labelText, base64Data, anchor, anchorPoint)
-        local btn = CreateFrame("Button", nil, parent)
-        btn:SetSize(80, 20)
-        if type(anchor) == "table" then
-            btn:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
-        else
-            btn:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", 22, 10)
-        end
-
-        local icon = btn:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(16, 16)
-        icon:SetPoint("LEFT", 0, 0)
-        icon:SetTexture(iconTexPath)
-
-        local text = btn:CreateFontString(nil, "OVERLAY")
-        text:SetPoint("LEFT", icon, "RIGHT", 4, 0)
-        ApplyFooterTextStyle(text)
-        text:SetText(labelText)
-        UI.SetTextFaint(text)
-
-        btn:SetScript("OnClick", function()
-            local link = C_EncodingUtil.DeserializeCBOR(C_EncodingUtil.DecodeBase64(base64Data)).link
-            StaticPopup_Show("KCDM_COPY_URL", nil, nil, {url = link})
-        end)
-        btn:SetScript("OnEnter", function() UI.SetTextColor(text, gold) end)
-        btn:SetScript("OnLeave", function() UI.SetTextFaint(text) end)
-
-        return btn, text
-    end
 
     versionText = ConfigFrame:CreateFontString(nil, "OVERLAY")
     versionText:SetPoint("BOTTOMRIGHT", ConfigFrame, "BOTTOMRIGHT", -22, 10)

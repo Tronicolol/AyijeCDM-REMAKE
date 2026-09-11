@@ -35,25 +35,6 @@ if CDM_C.ApplyShadow then
     CDM_C.ApplyShadow(Font18)
 end
 
-StaticPopupDialogs["KCDM_COPY_URL"] = {
-    text = L["Copy this URL:"],
-    button1 = L["Close"],
-    hasEditBox = true,
-    editBoxWidth = 280,
-    OnShow = function(self, data)
-        self.EditBox:SetText(data.url)
-        self.EditBox:HighlightText()
-        self.EditBox:SetFocus()
-    end,
-    EditBoxOnEscapePressed = function(self)
-        self:GetParent():Hide()
-    end,
-    timeout = 0,
-    whileDead = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-}
-
 StaticPopupDialogs["KCDM_CONFIRM_RESET_PROFILE"] = {
     text = L["Reset the current profile to default settings?"],
     button1 = L["Reset"],
