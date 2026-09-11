@@ -1,0 +1,15 @@
+## Title: |cFF3bb273KCDM|r
+# LOCAL STANDALONE COPY - distribution project IDs removed
+## Notes: Cooldown Manager
+## Version: 3.88
+## Interface: 120005, 120007
+## DefaultState: enabled
+## SavedVariables: KCDMDB
+
+Libs\embeds.xml
+Init.lua
+Locales\embeds.xml
+Core\embeds.xml
+Config\embeds.xml
+Modules\embeds.xml
+Core\Main.lua

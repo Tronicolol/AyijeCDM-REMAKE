@@ -1,0 +1,10 @@
+## Interface: 120005, 120007
+## Title: |cFF3bb273KCDM|r Options
+# LOCAL STANDALONE COPY - distribution project IDs removed
+## Notes: Cooldown Manager Options UI
+## Version: 3.88
+## LoadOnDemand: 1
+## Dependencies: KCDM
+
+Init.lua
+embeds.xml
