@@ -1,0 +1,44 @@
+name: One-shot KCDM social cleanup
+
+on:
+  push:
+    branches:
+      - refactor-kcdm
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove unused legacy social code
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('KCDM_Options/Init.lua')
+          s = p.read_text()
+          start = s.find('StaticPopupDialogs["KCDM_COPY_URL"] = {')
+          end = s.find('StaticPopupDialogs["KCDM_CONFIRM_RESET_PROFILE"] = {', start)
+          if start != -1 and end != -1:
+              s = s[:start] + s[end:]
+          p.write_text(s)
+
+          p = Path('KCDM_Options/ConfigFrame.lua')
+          s = p.read_text()
+          s = s.replace('    StaticPopup_Hide("KCDM_COPY_URL")\n', '')
+          start = s.find('    local function CreateSocialButton(')
+          end = s.find('    versionText = ConfigFrame:CreateFontString', start)
+          if start != -1 and end != -1:
+              s = s[:start] + s[end:]
+          p.write_text(s)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add KCDM_Options/Init.lua KCDM_Options/ConfigFrame.lua
+          git commit -m "Remove unused legacy social UI code"
+          git push origin HEAD:refactor-kcdm
