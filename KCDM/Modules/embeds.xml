@@ -17,6 +17,7 @@
     <Script file="BuffGroupOverlays.lua"/>
     <Script file="CooldownGroups.lua"/>
     <Script file="CooldownTextOverrides.lua"/>
+    <Script file="AuraBorderRemoval.lua"/>
     <Script file="TargetAuraOverlay.lua"/>
     <Script file="BlizzardProcSuppression.lua"/>
     <Script file="PerSpellGlowType.lua"/>
