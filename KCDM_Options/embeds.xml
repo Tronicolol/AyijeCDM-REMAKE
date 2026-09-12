@@ -19,8 +19,8 @@
     <Script file="BuffGroups.lua"/>
     <Script file="CooldownGroups.lua"/>
     <Script file="ProcSuppression.lua"/>
-    <Script file="ReadyGlowOptions.lua"/>
     <Script file="PerSpellGlowTypeOptions.lua"/>
+    <Script file="ReadyGlowOptions.lua"/>
 
     <Script file="ImportExport.lua"/>
     <Script file="Profiles.lua"/>
