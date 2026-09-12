@@ -11,6 +11,7 @@
     <Script file="Layout/Reanchor.lua"/>
     <Script file="GroupContainerUtils.lua"/>
     <Script file="TrackerUtils.lua"/>
+    <Script file="TrackerPixelAnchor.lua"/>
     <Script file="TrackerCooldownWatcher.lua"/>
     <Script file="TrackerSpellCooldownWatcher.lua"/>
     <Script file="TrackerBase.lua"/>
