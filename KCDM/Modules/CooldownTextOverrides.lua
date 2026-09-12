@@ -134,7 +134,7 @@ end
 
 if type(CDM.PositionCooldownGroupFrames) == "function" then
     hooksecurefunc(CDM, "PositionCooldownGroupFrames", function(_, _, frames)
-        for _, frame in ipairs(frames or EMPTY_FRAMES or {}) do
+        for _, frame in ipairs(frames or {}) do
             Apply(frame, frame.cdmViewerName)
         end
     end)
