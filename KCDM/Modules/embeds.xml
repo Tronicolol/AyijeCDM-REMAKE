@@ -23,5 +23,4 @@
     <Script file="PerSpellGlowType.lua"/>
     <Script file="PerSpellGlowTypeResolver.lua"/>
     <Script file="PlayerCastBar.lua"/>
-    <Script file="Externals.lua"/>
 </Ui>
