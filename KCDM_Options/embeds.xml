@@ -12,6 +12,7 @@
     <Script file="Fading.lua"/>
     <Script file="Assist.lua"/>
     <Script file="GroupEditorShared.lua"/>
+    <Script file="UnifiedBuffControlsOptions.lua"/>
     <Script file="BuffGroups.lua"/>
     <Script file="CooldownGroups.lua"/>
     <Script file="ProcSuppression.lua"/>
