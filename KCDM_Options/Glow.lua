@@ -35,7 +35,8 @@ end
 local function CreateGlowTab(page, tabId)
     typeSections = {}
     local RepositionPandemicSections
-    local scrollChild = UI.CreateScrollableTab(page, "KCDM_GlowScrollFrame", 1050, 520)
+    local ResizeScrollContent
+    local scrollChild, scrollFrame = UI.CreateScrollableTab(page, "KCDM_GlowScrollFrame", 700, 520)
 
     local mainHeader = UI.CreateHeader(scrollChild, L["Glow Settings"])
     mainHeader:SetPoint("TOPLEFT", 0, 0)
@@ -348,12 +349,30 @@ local function CreateGlowTab(page, tabId)
     )
     page.controls.procYOffset:SetPoint("TOPLEFT", page.controls.procXOffset, "BOTTOMLEFT", 0, -10)
 
+    ResizeScrollContent = function()
+        C_Timer.After(0, function()
+            local rawScrollChild = scrollFrame and scrollFrame:GetScrollChild()
+            if not rawScrollChild or not pandemicBorderColor then return end
+
+            local top = rawScrollChild:GetTop()
+            local bottom = pandemicBorderColor:GetBottom()
+            if not top or not bottom then return end
+
+            local contentHeight = math.max(scrollFrame:GetHeight() or 0, math.ceil(top - bottom + 30))
+            rawScrollChild:SetHeight(contentHeight)
+            scrollChild:SetHeight(math.max(1, contentHeight - 20))
+        end)
+    end
+
     RepositionPandemicSections = function(selectedType)
         UpdateTypeSections(selectedType)
         local activeSection = typeSections[selectedType]
         if activeSection and pandemicHeader then
             pandemicHeader:ClearAllPoints()
             pandemicHeader:SetPoint("TOPLEFT", activeSection, "BOTTOMLEFT", 0, -30)
+        end
+        if ResizeScrollContent then
+            ResizeScrollContent()
         end
     end
 
