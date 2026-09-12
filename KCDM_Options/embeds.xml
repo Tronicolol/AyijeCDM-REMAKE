@@ -35,4 +35,5 @@
     <Script file="Resources.lua"/>
     <Script file="Bars.lua"/>
     <Script file="CastBar.lua"/>
+    <Script file="FeatureMenuOrder.lua"/>
 </Ui>
