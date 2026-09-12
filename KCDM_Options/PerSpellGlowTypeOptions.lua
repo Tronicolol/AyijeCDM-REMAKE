@@ -56,57 +56,53 @@ end
 Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
     if IsCooldownSpellTextConfig(cfg) then
         local existingOv = cfg.existingOv
-        local readyGlowEnabled = existingOv and existingOv.readyGlowEnabled == true
+        local selectedValue = existingOv and existingOv.glowTypeOverride or "global"
+        local options = BuildSpellGlowTypeOptions()
 
-        if readyGlowEnabled then
-            local selectedValue = existingOv.glowTypeOverride or "global"
-            local options = BuildSpellGlowTypeOptions()
+        local label = rc:CreateFontString(nil, "ARTWORK", "KCDM_Font14")
+        label:SetText(L["Glow Type"])
+        label:SetPoint("TOPLEFT", NESTED_INDENT, yOff)
+        yOff = yOff - 24
 
-            local label = rc:CreateFontString(nil, "ARTWORK", "KCDM_Font14")
-            label:SetText(L["Glow Type"])
-            label:SetPoint("TOPLEFT", NESTED_INDENT, yOff)
-            yOff = yOff - 24
-
-            local dropdown
-            if cfg.createDropdown then
-                dropdown = cfg.createDropdown(rc)
-            else
-                dropdown = CreateFrame("DropdownButton", nil, rc, "WowStyle1DropdownTemplate")
-            end
-            dropdown:SetPoint("TOPLEFT", NESTED_INDENT, yOff)
-            dropdown:SetWidth(200)
-            dropdown:SetDefaultText(UI.GetOptionLabel(options, selectedValue, options[1].label))
-
-            UI.SetupValueDropdown(
-                dropdown,
-                options,
-                function()
-                    local ov = cfg.existingOv
-                    return ov and ov.glowTypeOverride or "global"
-                end,
-                function(value, optionLabel)
-                    local ov = cfg.ensureOv and cfg.ensureOv()
-                    if not ov then return end
-
-                    ov.glowTypeOverride = value ~= "global" and value or nil
-                    dropdown:SetDefaultText(optionLabel)
-
-                    if cfg.save then
-                        cfg.save()
-                    end
-
-                    if Runtime.Glow and Runtime.Glow.RefreshSpellGlowTypeOverrides then
-                        Runtime.Glow:RefreshSpellGlowTypeOverrides()
-                    end
-
-                    if cfg.onToggle then
-                        cfg.onToggle()
-                    end
-                end
-            )
-
-            yOff = yOff - 48
+        local dropdown
+        if cfg.createDropdown then
+            dropdown = cfg.createDropdown(rc)
+        else
+            dropdown = CreateFrame("DropdownButton", nil, rc, "WowStyle1DropdownTemplate")
         end
+        dropdown:SetPoint("TOPLEFT", NESTED_INDENT, yOff)
+        dropdown:SetWidth(200)
+        dropdown:SetDefaultText(UI.GetOptionLabel(options, selectedValue, options[1].label))
+
+        UI.SetupValueDropdown(
+            dropdown,
+            options,
+            function()
+                local ov = cfg.existingOv
+                return ov and ov.glowTypeOverride or "global"
+            end,
+            function(value, optionLabel)
+                local ov = cfg.ensureOv and cfg.ensureOv()
+                if not ov then return end
+
+                ov.glowTypeOverride = value ~= "global" and value or nil
+                dropdown:SetDefaultText(optionLabel)
+
+                if cfg.save then
+                    cfg.save()
+                end
+
+                if Runtime.Glow and Runtime.Glow.RefreshSpellGlowTypeOverrides then
+                    Runtime.Glow:RefreshSpellGlowTypeOverrides()
+                end
+
+                if cfg.onToggle then
+                    cfg.onToggle()
+                end
+            end
+        )
+
+        yOff = yOff - 48
     end
 
     return originalBuildTextOverrideWidgets(rc, yOff, cfg)
