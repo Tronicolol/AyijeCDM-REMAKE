@@ -11,8 +11,7 @@ if ns.cdmUnifiedTextSectionHeadersHooked then return end
 ns.cdmUnifiedTextSectionHeadersHooked = true
 
 local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
-local NESTED_TEXT_X = 64
-local NESTED_CHECKBOX_X = 30
+local NESTED_X = 40
 local SECTION_TITLE_SPACE = 32
 local SECTION_TITLE_GAP = 26
 
@@ -116,7 +115,7 @@ end
 
 local function CreateSectionTitle(parent, text, y)
     local title = parent:CreateFontString(nil, "ARTWORK", "KCDM_Font18")
-    title:SetPoint("TOPLEFT", NESTED_TEXT_X, y)
+    title:SetPoint("TOPLEFT", NESTED_X, y)
     title:SetText(text)
 
     local gold = CDM_C.GOLD or { r = 1, g = 0.82, b = 0 }
@@ -178,11 +177,7 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
                 end
 
                 if expanded and objectY < overrideY then
-                    if object.checkbox and object.label then
-                        shiftX = NESTED_CHECKBOX_X
-                    else
-                        shiftX = NESTED_TEXT_X
-                    end
+                    shiftX = NESTED_X
                 end
 
                 if shiftY ~= 0 or shiftX ~= 0 then
