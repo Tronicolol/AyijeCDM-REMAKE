@@ -100,8 +100,24 @@ local function CollectCooldownTexts(frame)
     return scratchTexts
 end
 
-local function Apply(frame, viewerName)
+local Apply
+
+local function EnsureCooldownHook(frame, viewerName)
+    local cooldown = frame and frame.Cooldown
+    if not cooldown or frame.cdmUnifiedCooldownTextHooked then return end
+    frame.cdmUnifiedCooldownTextHooked = true
+    hooksecurefunc(cooldown, "SetCooldown", function()
+        C_Timer.After(0, function()
+            if frame and frame:IsShown() then
+                Apply(frame, frame.cdmViewerName or viewerName)
+            end
+        end)
+    end)
+end
+
+Apply = function(frame, viewerName)
     if viewerName ~= VIEWERS.ESSENTIAL and viewerName ~= VIEWERS.UTILITY then return end
+    EnsureCooldownHook(frame, viewerName)
 
     local override = GetOverride(frame)
     local enabled = override and override.textOverride == true
