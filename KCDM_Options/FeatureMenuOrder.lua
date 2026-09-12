@@ -3,12 +3,34 @@ if not Runtime then return end
 
 local API = Runtime.API
 local ns = Runtime._OptionsNS
+local L = Runtime.L
 if not API or not ns then return end
 
 local function ApplyItemsLabel()
     local tabs = ns.ConfigTabs
     if tabs and tabs.racials then
         tabs.racials.label = "Items"
+    end
+end
+
+local function RelabelItemsCheckbox()
+    local root = ns.ConfigContent
+    if not root then return end
+
+    local oldLabel = (L and L["Enable Racials"]) or "Enable Racials"
+    local pending = { root }
+
+    while #pending > 0 do
+        local frame = table.remove(pending)
+        local label = frame.label
+        if label and label.GetText and label:GetText() == oldLabel then
+            label:SetText("Enable Items")
+        end
+
+        local children = { frame:GetChildren() }
+        for _, child in ipairs(children) do
+            pending[#pending + 1] = child
+        end
     end
 end
 
@@ -55,6 +77,7 @@ end
 
 local function ReorderFeatureButtons()
     ApplyItemsLabel()
+    RelabelItemsCheckbox()
 
     local tabs = ns.ConfigTabs
     if not tabs then return end
