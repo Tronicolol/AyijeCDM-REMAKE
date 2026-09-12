@@ -171,19 +171,12 @@ CDM.defaults = {
     defensivesEnabled = true,
     trinketsEnabled = true,
     resourcesEnabled = true,
-    externalsEnabled = true,
 
     -- Resources global settings (moved from per-class in schema v21)
     unifiedBorder = false,
     moveBuffsDown = false,
     moveBuffsDownOffset = 0,
     moveBuffsDownFallback = "lastResource",
-
-    -- Externals (ExternalDefensivesFrame) settings
-    externalsIconWidth = 30,
-    externalsIconHeight = 30,
-    externalsCooldownFontSize = 15,
-    externalsDisableBlink = true,
 
     -- Racials tracker settings
     racialsIconWidth = 40,
