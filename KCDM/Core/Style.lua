@@ -53,7 +53,6 @@ local VIEWER_DESC = {
         chargeOYKey2  = "essRow2ChargeOffsetY",
         isCooldown   = true,
         hasOverride  = true,
-        hasKeybind   = true,
         hookType     = "cooldown",
     },
     [VIEWERS.UTILITY] = {
@@ -67,7 +66,6 @@ local VIEWER_DESC = {
         chargeOYKey   = "utilityChargeOffsetY",
         isCooldown   = true,
         hasOverride  = true,
-        hasKeybind   = true,
         hookType     = "cooldown",
         hasUtilVisibility = true,
     },
@@ -259,12 +257,6 @@ local function RefreshStyleCache()
     styleCache.buffBarApplicationsOffsetX = CfgValue(db, defaults, "buffBarApplicationsOffsetX", 0)
     styleCache.buffBarApplicationsOffsetY = CfgValue(db, defaults, "buffBarApplicationsOffsetY", 0)
 
-    styleCache.assistFontSize = CfgValue(db, defaults, "assistFontSize", 15)
-    styleCache.assistColor = CfgValue(db, defaults, "assistColor", CDM_C.WHITE)
-    styleCache.assistPosition = CfgValue(db, defaults, "assistPosition", "TOPRIGHT")
-    styleCache.assistOffsetX = CfgValue(db, defaults, "assistOffsetX", 0)
-    styleCache.assistOffsetY = CfgValue(db, defaults, "assistOffsetY", 0)
-
     styleCache.isOneBorderMode = Pixel.IsOneBorderMode()
     styleCache.isBorderActive = CfgValue(db, defaults, "borderFile", "1 Pixel") ~= "None"
     styleCache.borderSize = CfgValue(db, defaults, "borderSize", 1)
@@ -446,7 +438,7 @@ local function EnsureCooldownTintOverlay(frame)
     if not tint then
         tint = frame:CreateTexture(nil, "ARTWORK", nil, 5)
         tint:SetAllPoints(frame.Icon)
-        tint:SetTexture(CDM_C.TEX_WHITE8X8 or "Interface\Buttons\WHITE8X8")
+        tint:SetTexture(CDM_C.TEX_WHITE8X8 or "Interface\\Buttons\\WHITE8X8")
         tint:SetBlendMode("MOD")
         tint:Hide()
         frame.cdmCooldownTintOverlay = tint
@@ -463,8 +455,6 @@ local function ApplyCooldownIconAppearance(frame, entry, auraActive, sid, fallba
     if entry and entry.auraOverlay then
         onCooldown = false
     elseif sid then
-        -- Detect real charges from the spell itself. Cooldown Manager can expose
-        -- a Charges visual data source even for spells that are not multi-charge.
         local chargeInfo = GetSpellCharges(sid)
         local maxCharges = chargeInfo and chargeInfo.maxCharges
         local isChargeSpell = IsSafeNumber(maxCharges) and maxCharges > 1
@@ -494,8 +484,6 @@ local function ApplyCooldownIconAppearance(frame, entry, auraActive, sid, fallba
     local color = styleCache.cooldownIconColor or CDM_C.WHITE
     local r, g, b = color.r or 1, color.g or 1, color.b or 1
 
-    -- Stable cooldown tint without touching Blizzard's icon alpha or vertex state.
-    -- White preserves the original appearance; darker colours darken the icon.
     tint:SetVertexColor(r, g, b, 1)
     tint:SetAlpha(1)
     tint:Show()
@@ -794,8 +782,6 @@ local function EnsureIconBorder(frame, host, borderKey, active, version)
     end
 end
 
-local RefreshKeybindForFrame
-
 function CDM:ApplyStyle(frame, vName, forceUpdate)
     if not frame then return end
 
@@ -1050,15 +1036,6 @@ function CDM:ApplyStyle(frame, vName, forceUpdate)
         frame.cdmLastFontSpellID = fontSpellID
     end
 
-    if desc and desc.hasKeybind then
-        local KB = CDM.Keybinds
-        if KB and KB.IsEnabled and KB:IsEnabled() then
-            RefreshKeybindForFrame(frame, KB, KB:GetCacheVersion(), styleVersion)
-        elseif frame.cdmKeybindContainer then
-            frame.cdmKeybindContainer:Hide()
-        end
-    end
-
     if isBuff then
         if fullUpdate and desc then
             EnsureFrameHooks(frame, desc.hookType)
@@ -1184,75 +1161,6 @@ function CDM:ApplyStyle(frame, vName, forceUpdate)
 
     if fullUpdate then
         frame.cdmHooksInitialized = true
-    end
-end
-
-RefreshKeybindForFrame = function(frame, KB, kbCacheVer, styleVersion)
-    if not frame.cdmKeybindContainer then
-        local container = CreateFrame("Frame", nil, frame)
-        container:SetAllPoints()
-        frame.cdmKeybindContainer = container
-        frame.cdmKeybindFS = container:CreateFontString(nil, "OVERLAY")
-        frame.cdmKeybindFS:SetDrawLayer("OVERLAY", 7)
-        frame.cdmKeybindFS:SetShadowOffset(0, 0)
-    end
-    frame.cdmKeybindContainer:SetFrameLevel(frame:GetFrameLevel() + 7)
-    frame.cdmKeybindContainer:Show()
-
-    local baseSpellID = GetBaseSpellID(frame)
-    local kbFS = frame.cdmKeybindFS
-    kbFS:SetIgnoreParentScale(true)
-    kbFS:ClearAllPoints()
-    kbFS:SetPoint(styleCache.assistPosition, frame, styleCache.assistPosition,
-                  styleCache.assistOffsetX, styleCache.assistOffsetY)
-    local kbFontPath = styleCache.fontPath or CDM_C.GetBaseFontPath()
-    local kbOutline = styleCache.textFontOutline
-    kbFS:SetFont(kbFontPath, FontSize(styleCache.assistFontSize), kbOutline)
-    kbFS:SetTextColor(styleCache.assistColor.r, styleCache.assistColor.g, styleCache.assistColor.b, styleCache.assistColor.a or 1)
-
-    local kbText = baseSpellID and KB:GetKeybindText(baseSpellID) or nil
-    if not kbText and frame.itemID then
-        kbText = KB:GetKeybindTextForItem(frame.itemID)
-    end
-    if not kbText and frame.spellID then
-        kbText = KB:GetKeybindText(frame.spellID)
-    end
-    if kbText then
-        kbFS:SetText(kbText)
-        kbFS:Show()
-    else
-        kbFS:SetText("")
-        kbFS:Hide()
-    end
-end
-
-function CDM:RefreshViewerKeybindText()
-    local KB = self.Keybinds
-    if not KB or not KB.IsEnabled or not KB:IsEnabled() then return end
-
-    if not styleCache.fontPath then
-        RefreshStyleCache()
-    end
-
-    local kbCacheVer = KB:GetCacheVersion()
-    local styleVersion = self.styleCacheVersion or 0
-
-    self:ForEachActiveFrame({ VIEWERS.ESSENTIAL, VIEWERS.UTILITY }, function(frame)
-        if frame.cdmKeybindContainer then
-            RefreshKeybindForFrame(frame, KB, kbCacheVer, styleVersion)
-        end
-    end)
-
-    for _, name in ipairs(CDM_C.TRACKER_FRAME_ACCESSORS) do
-        local accessor = self[name]
-        local frames = accessor and accessor()
-        if frames then
-            for _, frame in ipairs(frames) do
-                if frame.cdmKeybindContainer then
-                    RefreshKeybindForFrame(frame, KB, kbCacheVer, styleVersion)
-                end
-            end
-        end
     end
 end
 
