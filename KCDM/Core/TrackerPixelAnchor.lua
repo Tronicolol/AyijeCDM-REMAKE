@@ -49,10 +49,6 @@ local function GetVisualEdgeCompensation(relativePoint)
         return -pixel
     end
 
-    if relativePoint == "BOTTOMLEFT" or relativePoint == "BOTTOMRIGHT" then
-        return pixel
-    end
-
     return 0
 end
 
