@@ -10,7 +10,6 @@ local function CreateLayoutTab(page, tabId)
     local tabBar = UI.CreateSubTabBar(page, {
         { id = "cooldowns", label = L["Cooldowns"] },
         { id = "general", label = L["General"] },
-        { id = "externals", label = L["Externals"] },
     }, "cooldowns")
 
     local subPages = tabBar.subPages
@@ -122,10 +121,6 @@ local function CreateLayoutTab(page, tabId)
 
     UpdateUnlockControls()
     generalPage:HookScript("OnShow", UpdateScrollHeight)
-
-    if ns._CreateExternalsPanel then
-        ns._CreateExternalsPanel(subPages.externals, page)
-    end
 end
 
 API:RegisterConfigTab("layout", "Spells", CreateLayoutTab, 2)
