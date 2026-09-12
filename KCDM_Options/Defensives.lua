@@ -371,7 +371,7 @@ local function CreateDefensivesTab(page, tabId)
 
     local positionHeader = UI.CreateHeader(scrollChild, L["Position"])
     positionHeader:SetPoint("TOPLEFT", 0, NextY(0))
-    NextY(15)
+    NextY(30)
 
     local lblAnchor = scrollChild:CreateFontString(nil, "ARTWORK", "KCDM_Font14")
     lblAnchor:SetText(L["Anchor Position (relative to Player Frame)"])

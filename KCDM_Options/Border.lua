@@ -53,7 +53,7 @@ local function BuildBorders(subPage, page)
         if showSlider then
             page.zoomSlider:Show()
             page.hideOverlayCheckbox:ClearAllPoints()
-            page.hideOverlayCheckbox:SetPoint("TOPLEFT", page.zoomSlider, "BOTTOMLEFT", -20, -10)
+            page.hideOverlayCheckbox:SetPoint("TOPLEFT", page.zoomSlider, "BOTTOMLEFT", -40, -10)
         else
             page.zoomSlider:Hide()
             page.hideOverlayCheckbox:ClearAllPoints()
@@ -77,7 +77,7 @@ local function BuildBorders(subPage, page)
         CDM.db.zoomAmount = v
         API:Refresh("STYLE")
     end)
-    page.zoomSlider:SetPoint("TOPLEFT", page.zoomCheckbox, "BOTTOMLEFT", 20, -5)
+    page.zoomSlider:SetPoint("TOPLEFT", page.zoomCheckbox, "BOTTOMLEFT", 40, -5)
     if CDM.db.zoomIcons then yOff = yOff - 60 end
 
     page.hideOverlayCheckbox = UI.CreateModernCheckbox(
