@@ -6,10 +6,11 @@ local CDM_C = CDM.CONST
 local VIEWERS = CDM_C and CDM_C.VIEWERS
 if not VIEWERS then return end
 
--- Cooldown spell -> real target aura spell.
--- Rend's cast/cooldown spell is 772, while the debuff applied to the target is 388539.
-local TARGET_AURA_BY_SPELL = {
-    [772] = 388539,
+-- Exceptional cast/cooldown spell -> real target aura spell mappings.
+-- Most spells need no entry here: their own spell ID, base/override variants,
+-- or Blizzard's linkedSpellIDs are added automatically below.
+local TARGET_AURA_LINKS = {
+    [772] = 388539, -- Rend
 }
 
 local TRACKED_VIEWERS = { VIEWERS.ESSENTIAL, VIEWERS.UTILITY }
@@ -36,96 +37,188 @@ local function EnsureAuraContainerLoaded()
 end
 
 local function IsSafeID(value)
+    if value == nil then return false end
+    if issecretvalue and issecretvalue(value) then return false end
     return CDM.IsSafeNumber and CDM.IsSafeNumber(value) and value > 0
 end
 
-local function FindMappedAuraID(frame)
-    if not frame then return nil end
+local function SafeField(source, key)
+    if type(source) ~= "table" then return nil end
 
-    local function Resolve(spellID)
-        if not IsSafeID(spellID) then return nil end
-        return TARGET_AURA_BY_SPELL[spellID]
-    end
+    local ok, value = pcall(function()
+        return source[key]
+    end)
+    if not ok then return nil end
+    if issecretvalue and issecretvalue(value) then return nil end
+    return value
+end
 
-    local auraID = Resolve(frame.cdmCdGroupSpellID)
-    if auraID then return auraID end
+local function SafeCall(method, owner)
+    if type(method) ~= "function" then return nil end
 
-    if type(frame.GetSpellID) == "function" then
-        local ok, spellID = pcall(frame.GetSpellID, frame)
-        if ok then
-            auraID = Resolve(spellID)
-            if auraID then return auraID end
-        end
-    end
+    local ok, value = pcall(method, owner)
+    if not ok then return nil end
+    if issecretvalue and issecretvalue(value) then return nil end
+    return value
+end
 
-    local info
-    if type(frame.GetCooldownInfo) == "function" then
-        local ok, result = pcall(frame.GetCooldownInfo, frame)
-        if ok and type(result) == "table" then
-            info = result
-        end
-    elseif type(frame.cooldownInfo) == "table" then
-        info = frame.cooldownInfo
-    end
+local function AddSpellID(include, queue, spellID)
+    if not IsSafeID(spellID) or include[spellID] then return end
+    include[spellID] = true
+    queue[#queue + 1] = spellID
+end
 
-    if info then
-        auraID = Resolve(info.overrideTooltipSpellID)
-            or Resolve(info.overrideSpellID)
-            or Resolve(info.spellID)
-        if auraID then return auraID end
+local function AddCooldownInfoIDs(include, queue, info)
+    if type(info) ~= "table" then return end
 
-        if type(info.linkedSpellIDs) == "table" then
-            for i = 1, #info.linkedSpellIDs do
-                auraID = Resolve(info.linkedSpellIDs[i])
-                if auraID then return auraID end
+    AddSpellID(include, queue, SafeField(info, "spellID"))
+    AddSpellID(include, queue, SafeField(info, "overrideSpellID"))
+    AddSpellID(include, queue, SafeField(info, "overrideTooltipSpellID"))
+    AddSpellID(include, queue, SafeField(info, "linkedSpellID"))
+
+    local linkedSpellIDs = SafeField(info, "linkedSpellIDs")
+    if type(linkedSpellIDs) == "table" then
+        for index = 1, #linkedSpellIDs do
+            local ok, linkedSpellID = pcall(function()
+                return linkedSpellIDs[index]
+            end)
+            if ok then
+                AddSpellID(include, queue, linkedSpellID)
             end
+        end
+    end
+end
+
+local function ExpandSpellID(include, queue, spellID)
+    if not IsSafeID(spellID) then return end
+
+    if CDM.ForEachSpellMatchCandidate then
+        CDM:ForEachSpellMatchCandidate(spellID, function(candidate)
+            AddSpellID(include, queue, candidate)
+        end)
+    end
+
+    if C_Spell then
+        if type(C_Spell.GetBaseSpell) == "function" then
+            local ok, baseSpellID = pcall(C_Spell.GetBaseSpell, spellID)
+            if ok then AddSpellID(include, queue, baseSpellID) end
+        end
+
+        if type(C_Spell.GetOverrideSpell) == "function" then
+            local ok, overrideSpellID = pcall(C_Spell.GetOverrideSpell, spellID)
+            if ok then AddSpellID(include, queue, overrideSpellID) end
+        end
+    end
+
+    local linkedAura = TARGET_AURA_LINKS[spellID]
+    if type(linkedAura) == "number" then
+        AddSpellID(include, queue, linkedAura)
+    elseif type(linkedAura) == "table" then
+        for index = 1, #linkedAura do
+            AddSpellID(include, queue, linkedAura[index])
+        end
+    end
+end
+
+local function BuildIncludeSpellIDs(frame)
+    if not frame then return nil, nil end
+
+    local include = {}
+    local queue = {}
+
+    AddSpellID(include, queue, frame.cdmCdGroupSpellID)
+    AddSpellID(include, queue, frame.cdmBuffCategorySpellID)
+
+    AddSpellID(include, queue, SafeCall(frame.GetSpellID, frame))
+    AddSpellID(include, queue, SafeCall(frame.GetBaseSpellID, frame))
+    AddSpellID(include, queue, SafeCall(frame.GetLinkedSpell, frame))
+    AddSpellID(include, queue, SafeCall(frame.GetAuraSpellID, frame))
+
+    local frameInfo = SafeCall(frame.GetCooldownInfo, frame)
+    if type(frameInfo) ~= "table" then
+        frameInfo = frame.cooldownInfo
+    end
+    AddCooldownInfoIDs(include, queue, frameInfo)
+
+    local cooldownID = frame.cooldownID
+    if IsSafeID(cooldownID)
+        and C_CooldownViewer
+        and type(C_CooldownViewer.GetCooldownViewerCooldownInfo) == "function" then
+        local ok, viewerInfo = pcall(C_CooldownViewer.GetCooldownViewerCooldownInfo, cooldownID)
+        if ok then
+            AddCooldownInfoIDs(include, queue, viewerInfo)
         end
     end
 
     if CDM.GetSpellIDCandidates then
         local ok, candidates = pcall(CDM.GetSpellIDCandidates, CDM, frame)
         if ok and type(candidates) == "table" then
-            for i = 1, #candidates do
-                auraID = Resolve(candidates[i])
-                if auraID then return auraID end
+            for index = 1, #candidates do
+                local candidate = candidates[index]
+                AddSpellID(include, queue, candidate)
             end
         end
+    end
+
+    local index = 1
+    while index <= #queue do
+        ExpandSpellID(include, queue, queue[index])
+        index = index + 1
+    end
+
+    if next(include) == nil then return nil, nil end
+
+    local ordered = {}
+    for spellID in pairs(include) do
+        ordered[#ordered + 1] = spellID
+    end
+    table.sort(ordered)
+
+    local signatureParts = {}
+    for i = 1, #ordered do
+        signatureParts[i] = tostring(ordered[i])
+    end
+
+    return include, table.concat(signatureParts, ",")
+end
+
+local function GetAuraOverlayEntry(frame)
+    local map = CDM._auraOverlayEnabled
+    local cooldownID = frame and frame.cooldownID
+    if type(map) ~= "table" or not IsSafeID(cooldownID) then return nil end
+
+    local entry = map[cooldownID]
+    if entry and entry.auraOverlay == true then
+        return entry
     end
 
     return nil
 end
 
-local function IsAuraOverlayEnabled(frame)
-    local map = CDM._auraOverlayEnabled
-    local cooldownID = frame and frame.cooldownID
-    if type(map) ~= "table" or not IsSafeID(cooldownID) then return false end
+local function IsNativeAuraActive(frame)
+    if not frame then return false end
+    if frame.cooldownUseAuraDisplayTime == true then return true end
 
-    local entry = map[cooldownID]
-    return entry and entry.auraOverlay == true or false
+    local auraSpellID = SafeCall(frame.GetAuraSpellID, frame)
+    return IsSafeID(auraSpellID)
 end
 
 local function ApplyOverlayAppearance(frame, state)
     if not state then return end
 
     local sourceIcon = frame and frame.Icon
-    local icon = state.icon
-    if sourceIcon and icon then
-        local texture = sourceIcon:GetTexture()
-        if texture then
-            icon:SetTexture(texture)
-        end
-        icon:SetTexCoord(sourceIcon:GetTexCoord())
-        icon:SetVertexColor(1, 1, 1, 1)
-        icon:SetDesaturated(false)
+    if sourceIcon and state.icon then
+        state.icon:SetTexCoord(sourceIcon:GetTexCoord())
+        state.icon:SetVertexColor(1, 1, 1, 1)
+        state.icon:SetDesaturated(false)
     end
 
-    local cooldown = state.cooldown
-    if cooldown then
+    if state.cooldown then
         local db = CDM.db or {}
         local defaults = CDM.defaults or {}
         local swipe = db.swipeColor or defaults.swipeColor
         if swipe then
-            cooldown:SetSwipeColor(
+            state.cooldown:SetSwipeColor(
                 swipe.r or 0,
                 swipe.g or 0,
                 swipe.b or 0,
@@ -135,20 +228,20 @@ local function ApplyOverlayAppearance(frame, state)
     end
 end
 
-local function CreateOverlayState(frame, auraID)
+local function CreateOverlayState(frame, includeSpellIDs, signature)
     if not EnsureAuraContainerLoaded() then return nil end
 
     local state = {
-        auraID = auraID,
+        signature = signature,
         activeUnit = false,
     }
 
     local container = CreateFrame("AuraContainer", nil, frame, "CustomAuraContainerTemplate")
     container:SetAllPoints(frame)
     container:SetFrameLevel(frame:GetFrameLevel() + 1)
+    container:SetAlpha(0)
     state.container = container
 
-    local includeSpellIDs = { [auraID] = true }
     local button = container:AddAuraSlot(SLOT_KEY, "HARMFUL|PLAYER", {
         candidateFilters = {
             includeSpellIDs = includeSpellIDs,
@@ -166,6 +259,7 @@ local function CreateOverlayState(frame, auraID)
 
             local icon = auraButton:CreateTexture(nil, "ARTWORK")
             icon:SetAllPoints(auraButton)
+            auraButton:SetIcon(icon)
             state.icon = icon
 
             local cooldown = CreateFrame("Cooldown", nil, auraButton, "CooldownFrameTemplate")
@@ -185,43 +279,54 @@ local function CreateOverlayState(frame, auraID)
     })
 
     state.button = button
-
-    -- Unit assignment must happen after the slot exists so Blizzard registers
-    -- the correct UNIT_AURA processing for the container.
-    container:SetUnit("target")
-    container:UpdateAllAuras()
-    state.activeUnit = true
-
     states[frame] = state
     ApplyOverlayAppearance(frame, state)
     return state
 end
 
 local function DisableState(state)
-    if not state or not state.container or not state.activeUnit then return end
-
-    state.container:SetUnit("none")
-    state.container:UpdateAllAuras()
-    state.activeUnit = false
-end
-
-local function EnableState(frame, state, auraID)
     if not state or not state.container then return end
 
-    if state.auraID ~= auraID then
-        state.auraID = auraID
-        state.container:SetAuraSlotCandidateFilters(SLOT_KEY, {
-            includeSpellIDs = { [auraID] = true },
-        })
+    state.container:SetAlpha(0)
+
+    if state.activeUnit then
+        state.container:SetUnit("none")
+        state.container:UpdateAllAuras()
+        state.activeUnit = false
+    end
+end
+
+local function UpdateStateFilter(state, includeSpellIDs, signature)
+    if not state or not state.container or state.signature == signature then
+        return true
+    end
+
+    local ok = pcall(state.container.SetAuraSlotCandidateFilters, state.container, SLOT_KEY, {
+        includeSpellIDs = includeSpellIDs,
+    })
+    if not ok then return false end
+
+    state.signature = signature
+    return true
+end
+
+local function EnableState(frame, state, includeSpellIDs, signature)
+    if not state or not state.container then return end
+
+    if not UpdateStateFilter(state, includeSpellIDs, signature) then
+        DisableState(state)
+        return
     end
 
     ApplyOverlayAppearance(frame, state)
+    state.container:SetAlpha(1)
 
     if not state.activeUnit then
         state.container:SetUnit("target")
-        state.container:UpdateAllAuras()
         state.activeUnit = true
     end
+
+    state.container:UpdateAllAuras()
 end
 
 local BindFrame
@@ -232,6 +337,10 @@ local function EnsureFrameHooks(frame)
 
     frame:HookScript("OnShow", function(self)
         BindFrame(self)
+    end)
+
+    frame:HookScript("OnHide", function(self)
+        DisableState(states[self])
     end)
 
     if type(frame.SetCooldownID) == "function" then
@@ -251,27 +360,44 @@ local function EnsureFrameHooks(frame)
             BindFrame(self)
         end)
     end
+
+    if type(frame.OnAuraInstanceInfoSet) == "function" then
+        hooksecurefunc(frame, "OnAuraInstanceInfoSet", function(self)
+            BindFrame(self)
+        end)
+    end
+
+    if type(frame.OnAuraInstanceInfoCleared) == "function" then
+        hooksecurefunc(frame, "OnAuraInstanceInfoCleared", function(self)
+            BindFrame(self)
+        end)
+    end
 end
 
 BindFrame = function(frame)
     if not frame then return end
     EnsureFrameHooks(frame)
 
-    local auraID = FindMappedAuraID(frame)
-    local enabled = auraID and IsAuraOverlayEnabled(frame)
+    local entry = GetAuraOverlayEntry(frame)
     local state = states[frame]
 
-    if not enabled then
+    if not entry or not frame:IsShown() or IsNativeAuraActive(frame) then
+        DisableState(state)
+        return
+    end
+
+    local includeSpellIDs, signature = BuildIncludeSpellIDs(frame)
+    if not includeSpellIDs then
         DisableState(state)
         return
     end
 
     if not state then
-        state = CreateOverlayState(frame, auraID)
+        state = CreateOverlayState(frame, includeSpellIDs, signature)
         if not state then return end
-    else
-        EnableState(frame, state, auraID)
     end
+
+    EnableState(frame, state, includeSpellIDs, signature)
 end
 
 local function BindAllActiveFrames()
@@ -282,8 +408,28 @@ local function BindAllActiveFrames()
     end)
 end
 
--- Piggyback on KCDM's normal visual lifecycle only to keep a pooled frame bound
--- to the correct spell. This hook never triggers a refresh itself.
+local function RefreshTargetContainers()
+    for frame, state in pairs(states) do
+        if state.activeUnit and frame:IsShown() and GetAuraOverlayEntry(frame) then
+            -- AuraContainer only receives UNIT_AURA for the unit token. Blizzard
+            -- explicitly exposes UpdateAllAuras for external identity changes,
+            -- such as PLAYER_TARGET_CHANGED.
+            state.container:UpdateAllAuras()
+        else
+            DisableState(state)
+        end
+    end
+end
+
+local targetWatcher = CreateFrame("Frame")
+targetWatcher:RegisterEvent("PLAYER_TARGET_CHANGED")
+targetWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
+targetWatcher:SetScript("OnEvent", function()
+    RefreshTargetContainers()
+end)
+
+-- Piggyback on KCDM's normal visual lifecycle only to keep pooled frames bound
+-- to the correct spell/configuration. This hook never triggers a refresh itself.
 if type(CDM.RefreshFrameVisuals) == "function" then
     hooksecurefunc(CDM, "RefreshFrameVisuals", function(_, frame)
         BindFrame(frame)
