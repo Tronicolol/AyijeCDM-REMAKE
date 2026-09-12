@@ -17,6 +17,7 @@ local TRACKED_VIEWERS = { VIEWERS.ESSENTIAL, VIEWERS.UTILITY }
 local SLOT_KEY = "KCDMTargetAuraOverlay"
 local states = setmetatable({}, { __mode = "k" })
 local hookedFrames = setmetatable({}, { __mode = "k" })
+local pendingBinds = setmetatable({}, { __mode = "k" })
 
 local auraContainerLoaded = false
 
@@ -205,9 +206,12 @@ end
 local function ApplyOverlayAppearance(frame, state)
     if not state then return end
 
-    local sourceIcon = frame and frame.Icon
-    if sourceIcon and state.icon then
-        state.icon:SetTexCoord(sourceIcon:GetTexCoord())
+    if state.icon then
+        if CDM_C.ApplyIconTexCoord and CDM_C.GetEffectiveZoomAmount then
+            CDM_C.ApplyIconTexCoord(state.icon, CDM_C.GetEffectiveZoomAmount())
+        else
+            state.icon:SetTexCoord(0, 1, 0, 1)
+        end
         state.icon:SetVertexColor(1, 1, 1, 1)
         state.icon:SetDesaturated(false)
     end
@@ -330,12 +334,22 @@ end
 
 local BindFrame
 
+local function QueueBindFrame(frame)
+    if not frame or pendingBinds[frame] then return end
+
+    pendingBinds[frame] = true
+    C_Timer.After(0, function()
+        pendingBinds[frame] = nil
+        BindFrame(frame)
+    end)
+end
+
 local function EnsureFrameHooks(frame)
     if not frame or hookedFrames[frame] then return end
     hookedFrames[frame] = true
 
     frame:HookScript("OnShow", function(self)
-        BindFrame(self)
+        QueueBindFrame(self)
     end)
 
     frame:HookScript("OnHide", function(self)
@@ -344,31 +358,31 @@ local function EnsureFrameHooks(frame)
 
     if type(frame.SetCooldownID) == "function" then
         hooksecurefunc(frame, "SetCooldownID", function(self)
-            BindFrame(self)
+            QueueBindFrame(self)
         end)
     end
 
     if type(frame.ClearCooldownID) == "function" then
         hooksecurefunc(frame, "ClearCooldownID", function(self)
-            BindFrame(self)
+            QueueBindFrame(self)
         end)
     end
 
     if type(frame.SetOverrideSpell) == "function" then
         hooksecurefunc(frame, "SetOverrideSpell", function(self)
-            BindFrame(self)
+            QueueBindFrame(self)
         end)
     end
 
     if type(frame.OnAuraInstanceInfoSet) == "function" then
         hooksecurefunc(frame, "OnAuraInstanceInfoSet", function(self)
-            BindFrame(self)
+            QueueBindFrame(self)
         end)
     end
 
     if type(frame.OnAuraInstanceInfoCleared) == "function" then
         hooksecurefunc(frame, "OnAuraInstanceInfoCleared", function(self)
-            BindFrame(self)
+            QueueBindFrame(self)
         end)
     end
 end
