@@ -108,6 +108,29 @@ local function CollectDirectObjects(parent)
     return objects
 end
 
+local function ExpandScrollContent(parent, addedHeight)
+    if not parent or not addedHeight or addedHeight <= 0 then return end
+    if not parent.GetParent or not parent.GetHeight or not parent.SetHeight then return end
+
+    local scrollChild = parent:GetParent()
+    local scrollFrame = scrollChild and scrollChild.GetParent and scrollChild:GetParent() or nil
+    if not scrollFrame or not scrollFrame.IsObjectType or not scrollFrame:IsObjectType("ScrollFrame") then
+        return
+    end
+
+    local parentHeight = parent:GetHeight()
+    if parentHeight and parentHeight > 0 then
+        parent:SetHeight(parentHeight + addedHeight)
+    end
+
+    if scrollChild.GetHeight and scrollChild.SetHeight then
+        local childHeight = scrollChild:GetHeight()
+        if childHeight and childHeight > 0 then
+            scrollChild:SetHeight(childHeight + addedHeight)
+        end
+    end
+end
+
 local function ApplySpacing(parent)
     pendingParents[parent] = nil
     if not parent or not parent.GetRegions then return end
@@ -136,6 +159,8 @@ local function ApplySpacing(parent)
     if not headers[1].cdmSectionGapApplied then
         headers[1].cdmSectionGapApplied = true
     end
+
+    local addedHeight = 0
 
     for index = 2, #headers do
         local header = headers[index]
@@ -169,9 +194,15 @@ local function ApplySpacing(parent)
                 ShiftAllPoints(header, deltaY)
             end
 
+            if deltaY < 0 then
+                addedHeight = addedHeight - deltaY
+            end
+
             header.cdmSectionGapApplied = true
         end
     end
+
+    ExpandScrollContent(parent, addedHeight)
 end
 
 local function ScheduleSpacing(parent)
