@@ -111,6 +111,7 @@ local function BuildGlobal(subPage, page)
     local rc, sc = UI.MakeSubPageScroll(subPage, "KCDM_Text_GlobalScrollFrame")
     local yOff = 0
 
+    SectionHeader(rc, L["Font Style"], yOff); yOff = yOff - 30
     FontDropdown(rc, yOff, page); yOff = yOff - 55
     OutlineDropdown(rc, yOff, page); yOff = yOff - 65
 
