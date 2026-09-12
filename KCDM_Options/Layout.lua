@@ -128,4 +128,4 @@ local function CreateLayoutTab(page, tabId)
     end
 end
 
-API:RegisterConfigTab("layout", L["Layout"], CreateLayoutTab, 2)
+API:RegisterConfigTab("layout", "Spells", CreateLayoutTab, 2)
