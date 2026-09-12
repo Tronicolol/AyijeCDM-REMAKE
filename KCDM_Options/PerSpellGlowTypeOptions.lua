@@ -12,7 +12,7 @@ if Shared._perSpellGlowTypeWrapped then return end
 local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
 Shared._perSpellGlowTypeWrapped = true
 
-local NESTED_INDENT = 20
+local BASE_INDENT = 0
 
 local GLOW_TYPE_OPTIONS = {
     { value = "pixel", label = L["Pixel Glow"] },
@@ -61,7 +61,7 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
 
         local label = rc:CreateFontString(nil, "ARTWORK", "KCDM_Font14")
         label:SetText(L["Glow Type"])
-        label:SetPoint("TOPLEFT", NESTED_INDENT, yOff)
+        label:SetPoint("TOPLEFT", BASE_INDENT, yOff)
         yOff = yOff - 24
 
         local dropdown
@@ -70,7 +70,7 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
         else
             dropdown = CreateFrame("DropdownButton", nil, rc, "WowStyle1DropdownTemplate")
         end
-        dropdown:SetPoint("TOPLEFT", NESTED_INDENT, yOff)
+        dropdown:SetPoint("TOPLEFT", BASE_INDENT, yOff)
         dropdown:SetWidth(200)
         dropdown:SetDefaultText(UI.GetOptionLabel(options, selectedValue, options[1].label))
 
