@@ -15,6 +15,7 @@ local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
 local MAIN_TITLE_SPACE = 34
 local SECTION_SPACE = 42
 local SECTION_TITLE_GAP = 30
+local SECTION_INDENT = 18
 
 local function CaptureObjects(parent)
     local objects = {}
@@ -65,8 +66,11 @@ local function GetDirectAnchorY(object, parent)
     return nil
 end
 
-local function ShiftDirectParentAnchors(object, parent, delta)
+local function ShiftDirectParentAnchors(object, parent, deltaY, deltaX)
     if not object.GetNumPoints or not object.GetPoint or not object.ClearAllPoints or not object.SetPoint then return end
+
+    deltaY = deltaY or 0
+    deltaX = deltaX or 0
 
     local points = {}
     for i = 1, object:GetNumPoints() do
@@ -83,7 +87,8 @@ local function ShiftDirectParentAnchors(object, parent, delta)
     local changed = false
     for _, data in ipairs(points) do
         if data.relativeTo == parent then
-            data.y = data.y + delta
+            data.x = data.x + deltaX
+            data.y = data.y + deltaY
             changed = true
         end
     end
@@ -116,7 +121,7 @@ end
 
 local function CreateMainTitle(parent, y)
     local title = parent:CreateFontString(nil, "ARTWORK", "KCDM_Font18")
-    title:SetPoint("TOPLEFT", 0, y)
+    title:SetPoint("TOPLEFT", SECTION_INDENT, y)
     title:SetText(L["Text Overrides"] or "Text Overrides")
 
     local gold = CDM_C.GOLD or { r = 1, g = 0.82, b = 0 }
@@ -126,7 +131,7 @@ end
 
 local function CreateSectionTitle(parent, text, y)
     local title = parent:CreateFontString(nil, "ARTWORK", "KCDM_Font18")
-    title:SetPoint("TOPLEFT", 0, y)
+    title:SetPoint("TOPLEFT", SECTION_INDENT, y)
     title:SetText(text)
     title:SetTextColor(0.46, 0.72, 0.96, 1)
     return title
@@ -170,22 +175,27 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
         if object ~= mainTitle then
             local objectY = originalY[object]
             if objectY ~= nil then
-                local shift = 0
+                local shiftY = 0
+                local shiftX = 0
 
                 if reclaim > 0 and objectY <= overrideY then
-                    shift = shift + reclaim
+                    shiftY = shiftY + reclaim
                 end
 
                 if expanded and objectY <= cooldownY then
-                    shift = shift - MAIN_TITLE_SPACE - SECTION_SPACE
+                    shiftY = shiftY - MAIN_TITLE_SPACE - SECTION_SPACE
                 end
 
                 if expanded and objectY <= chargesY then
-                    shift = shift - SECTION_SPACE
+                    shiftY = shiftY - SECTION_SPACE
                 end
 
-                if shift ~= 0 then
-                    ShiftDirectParentAnchors(object, rc, shift)
+                if expanded and objectY < overrideY then
+                    shiftX = SECTION_INDENT
+                end
+
+                if shiftY ~= 0 or shiftX ~= 0 then
+                    ShiftDirectParentAnchors(object, rc, shiftY, shiftX)
                 end
             end
         end
@@ -196,7 +206,7 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
 
     if mainTitle then
         mainTitle:ClearAllPoints()
-        mainTitle:SetPoint("TOPLEFT", 0, mainTitleTargetY)
+        mainTitle:SetPoint("TOPLEFT", SECTION_INDENT, mainTitleTargetY)
     else
         mainTitle = CreateMainTitle(rc, mainTitleTargetY)
     end
