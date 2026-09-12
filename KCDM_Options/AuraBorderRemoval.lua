@@ -7,7 +7,8 @@ local L = Runtime.L
 if not UI then return end
 
 local HIDDEN_SECTION_HEIGHT = 60
-local NESTED_INDENT = 36
+local NESTED_TEXT_X = 64
+local NESTED_CHECKBOX_X = 30
 local pendingAuraBorderPicker = setmetatable({}, { __mode = "k" })
 
 local function GetDirectAnchorY(object, parent)
@@ -87,7 +88,7 @@ local function SetDirectTopLeftX(object, parent, targetX)
 end
 
 local function FindCheckboxRow(parent, label)
-    if not parent or not parent.GetChildren then return nil end
+    if not parent or not parent.GetChildren or not label then return nil end
 
     for _, object in ipairs({ parent:GetChildren() }) do
         if object and object.label and object.label.GetText and object.label:GetText() == label then
@@ -119,7 +120,7 @@ local function NormalizeNestedLayout(parent)
         if label then
             local row = FindCheckboxRow(parent, label)
             if row then
-                SetDirectTopLeftX(row, parent, NESTED_INDENT)
+                SetDirectTopLeftX(row, parent, NESTED_CHECKBOX_X)
             end
         end
     end
@@ -128,7 +129,7 @@ local function NormalizeNestedLayout(parent)
         for _, region in ipairs({ parent:GetRegions() }) do
             if region and region.IsObjectType and region:IsObjectType("FontString") and region.GetText then
                 if region:GetText() == L["Glow Color:"] then
-                    SetDirectTopLeftX(region, parent, NESTED_INDENT)
+                    SetDirectTopLeftX(region, parent, NESTED_TEXT_X)
                 end
             end
         end
