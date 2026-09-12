@@ -12,9 +12,9 @@ if ns.cdmUnifiedTextSectionHeadersHooked then return end
 ns.cdmUnifiedTextSectionHeadersHooked = true
 
 local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
-local MAIN_HEADER_SPACE = 34
+local MAIN_TITLE_SPACE = 34
 local SECTION_SPACE = 42
-local SECTION_TITLE_OFFSET = 9
+local SECTION_TITLE_GAP = 30
 
 local function CaptureObjects(parent)
     local objects = {}
@@ -105,13 +105,13 @@ local function FindCheckboxRow(objects, label)
     return nil
 end
 
-local function HasText(objects, text)
+local function FindTextRegion(objects, text)
     for _, object in ipairs(objects) do
         if object.GetText and object:GetText() == text then
-            return true
+            return object
         end
     end
-    return false
+    return nil
 end
 
 local function CreateMainTitle(parent, y)
@@ -135,76 +135,90 @@ end
 Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
     local before = CaptureObjects(rc)
     local resultY = originalBuildTextOverrideWidgets(rc, yOff, cfg)
-
-    local existingOv = cfg and cfg.existingOv
-    if not existingOv or existingOv.textOverride ~= true then
-        return resultY
-    end
-
     local objects = GetNewObjects(rc, before)
+
     local overrideRow = FindCheckboxRow(objects, L["Override Text Settings"])
-    local cooldownRow = FindCheckboxRow(objects, L["Hide Cooldown Timer"])
-    local chargesRow = FindCheckboxRow(objects, L["Hide Charges"])
-    if not overrideRow or not cooldownRow or not chargesRow then
+    if not overrideRow then
         return resultY
     end
 
     local overrideY = GetDirectAnchorY(overrideRow, rc)
-    local cooldownY = GetDirectAnchorY(cooldownRow, rc)
-    local chargesY = GetDirectAnchorY(chargesRow, rc)
-    if overrideY == nil or cooldownY == nil or chargesY == nil then
+    if overrideY == nil then
         return resultY
     end
+
+    local mainText = L["Text Overrides"] or "Text Overrides"
+    local mainTitle = FindTextRegion(objects, mainText)
+    local mainTitleY = mainTitle and GetDirectAnchorY(mainTitle, rc) or nil
+    local reclaim = 0
+    if mainTitleY ~= nil and mainTitleY > overrideY then
+        reclaim = math.max(0, mainTitleY - overrideY)
+    end
+
+    local cooldownRow = FindCheckboxRow(objects, L["Hide Cooldown Timer"])
+    local chargesRow = FindCheckboxRow(objects, L["Hide Charges"])
+    local cooldownY = cooldownRow and GetDirectAnchorY(cooldownRow, rc) or nil
+    local chargesY = chargesRow and GetDirectAnchorY(chargesRow, rc) or nil
+    local expanded = cooldownY ~= nil and chargesY ~= nil
 
     local originalY = {}
     for _, object in ipairs(objects) do
         originalY[object] = GetDirectAnchorY(object, rc)
     end
 
-    local hasMainTitle = HasText(objects, L["Text Overrides"] or "Text Overrides")
-    local mainShift = hasMainTitle and 0 or -MAIN_HEADER_SPACE
-
     for _, object in ipairs(objects) do
-        local objectY = originalY[object]
-        if objectY ~= nil then
-            local shift = 0
+        if object ~= mainTitle then
+            local objectY = originalY[object]
+            if objectY ~= nil then
+                local shift = 0
 
-            if not hasMainTitle and objectY <= overrideY then
-                shift = shift - MAIN_HEADER_SPACE
-            end
-            if objectY <= cooldownY then
-                shift = shift - SECTION_SPACE
-            end
-            if objectY <= chargesY then
-                shift = shift - SECTION_SPACE
-            end
+                if reclaim > 0 and objectY <= overrideY then
+                    shift = shift + reclaim
+                end
 
-            if shift ~= 0 then
-                ShiftDirectParentAnchors(object, rc, shift)
+                if expanded and objectY <= cooldownY then
+                    shift = shift - MAIN_TITLE_SPACE - SECTION_SPACE
+                end
+
+                if expanded and objectY <= chargesY then
+                    shift = shift - SECTION_SPACE
+                end
+
+                if shift ~= 0 then
+                    ShiftDirectParentAnchors(object, rc, shift)
+                end
             end
         end
     end
 
-    if not hasMainTitle then
-        CreateMainTitle(rc, overrideY - 2)
+    local finalOverrideY = overrideY + reclaim
+    local mainTitleTargetY = finalOverrideY - MAIN_TITLE_SPACE
+
+    if mainTitle then
+        mainTitle:ClearAllPoints()
+        mainTitle:SetPoint("TOPLEFT", 0, mainTitleTargetY)
+    else
+        mainTitle = CreateMainTitle(rc, mainTitleTargetY)
     end
+
+    if not expanded then
+        return resultY + reclaim - MAIN_TITLE_SPACE
+    end
+
+    local finalCooldownY = cooldownY + reclaim - MAIN_TITLE_SPACE - SECTION_SPACE
+    local finalChargesY = chargesY + reclaim - MAIN_TITLE_SPACE - (SECTION_SPACE * 2)
 
     CreateSectionTitle(
         rc,
         L["Cooldown Timer"] or "Cooldown Timer",
-        cooldownY + mainShift - SECTION_TITLE_OFFSET
+        finalCooldownY + SECTION_TITLE_GAP
     )
 
     CreateSectionTitle(
         rc,
         L["Charges"] or "Charges",
-        chargesY + mainShift - SECTION_SPACE - SECTION_TITLE_OFFSET
+        finalChargesY + SECTION_TITLE_GAP
     )
 
-    local extraHeight = SECTION_SPACE * 2
-    if not hasMainTitle then
-        extraHeight = extraHeight + MAIN_HEADER_SPACE
-    end
-
-    return resultY - extraHeight
+    return resultY + reclaim - MAIN_TITLE_SPACE - (SECTION_SPACE * 2)
 end
