@@ -1,0 +1,304 @@
+name: Temporary source cleanup
+
+on:
+  push:
+    branches:
+      - arreglos-visuales
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arreglos-visuales
+
+      - name: Remove obsolete source paths
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def load(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def save(path, text):
+              Path(path).write_text(text, encoding="utf-8")
+
+          def remove_between(text, start, end, label):
+              start_index = text.find(start)
+              if start_index < 0:
+                  raise RuntimeError(f"{label}: start marker not found")
+              end_index = text.find(end, start_index)
+              if end_index < 0:
+                  raise RuntimeError(f"{label}: end marker not found")
+              return text[:start_index] + text[end_index:]
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{label}: expected 1 match, got {count}")
+              return text.replace(old, new, 1)
+
+          def remove_exact_block(text, start, end, label):
+              start_index = text.find(start)
+              if start_index < 0:
+                  raise RuntimeError(f"{label}: start marker not found")
+              end_index = text.find(end, start_index)
+              if end_index < 0:
+                  raise RuntimeError(f"{label}: end marker not found")
+              end_index += len(end)
+              return text[:start_index] + text[end_index:]
+
+          def assert_absent(text, tokens, label):
+              leftovers = [token for token in tokens if token in text]
+              if leftovers:
+                  raise RuntimeError(f"{label}: leftover tokens: {leftovers}")
+
+          # Bars: groups are populated only from Ungrouped; remove the separate spell picker.
+          path = "KCDM_Options/Bars.lua"
+          text = load(path)
+          text = text.replace("    local pickerActiveGroupIndex = nil\n", "")
+          text = remove_between(
+              text,
+              "    local function GetViewerSpellListForSpec(specID)\n",
+              "    local function MarkSafe(set, id)\n",
+              "Bars picker data helpers",
+          )
+          text = re.sub(r"^\s*pickerActiveGroupIndex = nil\n", "", text, flags=re.MULTILINE)
+          text = remove_between(
+              text,
+              "    local function ShowSpellPickerPanel(groupIndex)\n",
+              "    local headerPool, groupContainerPool, emptyRowPool =\n",
+              "Bars picker panel",
+          )
+          picker_delete_block = '''                if pickerActiveGroupIndex then
+                    if pickerActiveGroupIndex == groupIndex then
+                        pickerActiveGroupIndex = nil
+                        ClearRightPanel()
+                    elseif pickerActiveGroupIndex > groupIndex then
+                        pickerActiveGroupIndex = pickerActiveGroupIndex - 1
+                        needReshow = true
+                    end
+                end
+'''
+          text = text.replace(picker_delete_block, "")
+          picker_reshow = '''                if needReshow then
+                    if pickerActiveGroupIndex then
+                        ShowSpellPickerPanel(pickerActiveGroupIndex)
+                    elseif selectedSpellID then
+'''
+          picker_reshow_replacement = '''                if needReshow then
+                    if selectedSpellID then
+'''
+          text = text.replace(picker_reshow, picker_reshow_replacement)
+          text = remove_between(
+              text,
+              "        if not btnRefs.spell then\n",
+              "        leftChild:SetHeight(math.max(800, -yOff + 40))\n",
+              "Bars Add Spell button",
+          )
+          text = text.replace(
+              "        leftChild:SetHeight(math.max(800, -yOff + 40))\n",
+              "        leftChild:SetHeight(math.max(800, -yOff + 40))\n",
+              1,
+          )
+          assert_absent(
+              text,
+              ["pickerActiveGroupIndex", "ShowSpellPickerPanel", "GetAvailableSpellsForPicker", "GetViewerSpellListForSpec", 'L["Add Spell"]'],
+              "Bars",
+          )
+          save(path, text)
+
+          # Buff Groups: remove Add Icon/native picker, preserving Add Custom Buff and Ungrouped drag/drop.
+          path = "KCDM_Options/BuffGroups.lua"
+          text = load(path)
+          text = text.replace("    local pickerActiveGroupIndex = nil\n", "")
+          text = re.sub(r"^\s*pickerActiveGroupIndex = nil\n", "", text, flags=re.MULTILINE)
+          text = remove_between(
+              text,
+              "    local function GetViewerSpellListForSpec(specID)\n",
+              "    local function GetUngroupedBuffSpellsFromCache(specID)\n",
+              "Buff Groups picker data helpers",
+          )
+          text = text.replace("    local ShowSpellPickerPanel\n", "")
+          text = remove_between(
+              text,
+              "    local function UpdateAddIconButtonState()\n",
+              "    GetCustomBuffEntry = function(spellID)\n",
+              "Buff Groups Add Icon picker",
+          )
+          text = re.sub(r"^\s*UpdateAddIconButtonState\(\)\n", "", text, flags=re.MULTILINE)
+          text = remove_between(
+              text,
+              "        if not btnRefs.icon then\n",
+              "        if not btnRefs.customBuff then\n",
+              "Buff Groups Add Icon button",
+          )
+
+          # Remove stale picker bookkeeping left in group deletion/refresh branches.
+          text = re.sub(
+              r"\n\s*if pickerActiveGroupIndex then\n.*?\n\s*end\n(?=\s*local newExpanded = \{\})",
+              "\n",
+              text,
+              count=1,
+              flags=re.DOTALL,
+          )
+          text = text.replace(
+              '''                if needReshow then
+                    if pickerActiveGroupIndex then
+                        ShowSpellPickerPanel(pickerActiveGroupIndex)
+                    elseif selectedSpellID then
+''',
+              '''                if needReshow then
+                    if selectedSpellID then
+''',
+          )
+          assert_absent(
+              text,
+              ["pickerActiveGroupIndex", "ShowSpellPickerPanel", "GetAvailableSpellsForPicker", "GetViewerSpellListForSpec", "UpdateAddIconButtonState", 'L["Add Icon"]'],
+              "BuffGroups",
+          )
+          save(path, text)
+
+          # Racials runtime: remove all party/raid-frame anchoring implementation.
+          path = "KCDM/Modules/Racials.lua"
+          text = load(path)
+          text = remove_between(
+              text,
+              "local function AnchorRacialsToPartyFrame(partyFrame, point, relativePoint, offsetX, offsetY)\n",
+              "local racialsTrackerAcquireOpts = {\n",
+              "Racials party-frame helpers",
+          )
+          position_start = "local racialsLastUsedPartyAnchor = false\n\nlocal function UpdateContainerPosition()\n"
+          position_end = "local racialsUpdatePending = false\n"
+          start_index = text.find(position_start)
+          if start_index < 0:
+              raise RuntimeError("Racials position block: start marker not found")
+          end_index = text.find(position_end, start_index)
+          if end_index < 0:
+              raise RuntimeError("Racials position block: end marker not found")
+          replacement = '''local function UpdateContainerPosition()
+    if not racialsContainer then return end
+
+    local anchorPoint = CDM.db and CDM.db.racialsAnchorPoint or "TOPLEFT"
+    local offsetX = CDM.db and CDM.db.racialsOffsetX or 0
+    local offsetY = CDM.db and CDM.db.racialsOffsetY or 0
+    CDM.AnchorToPlayerFrame(racialsContainer, anchorPoint, offsetX, offsetY, "Racials")
+end
+
+'''
+          text = text[:start_index] + replacement + text[end_index:]
+          assert_absent(
+              text,
+              ["racialsUsePartyFrame", "racialsPartyFrame", "racialsRaidFrame", "ResolvePartyAnchorFrame", "DandersFrames", "Grid2Layout", "CompactPartyFrameMember"],
+              "Racials runtime",
+          )
+          save(path, text)
+
+          # Racials options: remove the party/raid anchoring section and anchor Position directly after Icon Size.
+          path = "KCDM_Options/Racials.lua"
+          text = load(path)
+          party_start = "    local partyHeader = UI.CreateHeader(scrollChild, L[\"Party Frame Anchoring\"])\n"
+          position_line = "    local positionHeader = UI.CreateHeader(scrollChild, L[\"Position\"], page.racialsUsePartyFrameCheckbox, -15)\n"
+          start_index = text.find(party_start)
+          if start_index < 0:
+              raise RuntimeError("Racials options party block: start marker not found")
+          position_index = text.find(position_line, start_index)
+          if position_index < 0:
+              raise RuntimeError("Racials options Position marker not found")
+          text = text[:start_index] + '    local positionHeader = UI.CreateHeader(scrollChild, L["Position"], page.racialsIconHeightSlider, -30)\n' + text[position_index + len(position_line):]
+          text = remove_between(
+              text,
+              "    UpdateControls = function()\n",
+              "    setControlsEnabled = UI.SetupModuleToggle(scrollChild, page.controls.racialsEnabled)\n",
+              "Racials options UpdateControls",
+          )
+          assert_absent(
+              text,
+              ["racialsUsePartyFrame", "racialsPartyFrame", "racialsRaidFrame", 'L["Party Frame Anchoring"]', 'L["Anchor to Party Frame"]'],
+              "Racials options",
+          )
+          save(path, text)
+
+          # Remove defaults and export keys for the deleted Racials anchoring feature.
+          path = "KCDM/Config/Defaults.lua"
+          text = load(path)
+          text = remove_between(
+              text,
+              "    -- Party frame anchoring settings\n",
+              "    -- Per-bar resource settings (schema v9)\n",
+              "Racials party defaults",
+          )
+          assert_absent(text, ["racialsUsePartyFrame", "racialsPartyFrame", "racialsRaidFrame"], "Defaults")
+          save(path, text)
+
+          path = "KCDM_Options/ConfigKeys.lua"
+          text = load(path)
+          for key in (
+              "racialsUsePartyFrame",
+              "racialsPartyFrameSide",
+              "racialsPartyFrameOffsetX",
+              "racialsPartyFrameOffsetY",
+              "racialsRaidFrameAnchorPoint",
+              "racialsRaidFrameRelativePoint",
+              "racialsRaidFrameOffsetX",
+              "racialsRaidFrameOffsetY",
+          ):
+              text, count = re.subn(rf'^\s*"{re.escape(key)}",\n', "", text, flags=re.MULTILINE)
+              if count != 1:
+                  raise RuntimeError(f"ConfigKeys {key}: expected 1 removal, got {count}")
+          assert_absent(text, ["racialsUsePartyFrame", "racialsPartyFrame", "racialsRaidFrame"], "ConfigKeys")
+          save(path, text)
+
+          # Direct source cleanup replaces the temporary UI-removal shim.
+          removed_controls = Path("KCDM_Options/RemovedControls.lua")
+          if removed_controls.exists():
+              removed_controls.unlink()
+
+          path = "KCDM_Options/embeds.xml"
+          text = load(path)
+          text = text.replace('    <Script file="RemovedControls.lua"/>\n', "")
+          save(path, text)
+
+          # Keep only the historical saved-setting cleanup for old profiles, with a migration name.
+          old_migration = Path("KCDM/Modules/RacialsPartyAnchorRemoval.lua")
+          new_migration = Path("KCDM/Modules/RacialsPartyAnchorMigration.lua")
+          if old_migration.exists():
+              old_migration.rename(new_migration)
+
+          path = "KCDM/Modules/embeds.xml"
+          text = load(path)
+          text = text.replace('    <Script file="RacialsPartyAnchorRemoval.lua"/>', '    <Script file="RacialsPartyAnchorMigration.lua"/>')
+          save(path, text)
+
+          print("Source cleanup completed successfully")
+          PY
+
+      - name: Validate patch
+        shell: bash
+        run: |
+          git diff --check
+          ! grep -R "Add Icon" KCDM_Options/BuffGroups.lua
+          ! grep -R "Add Spell" KCDM_Options/Bars.lua
+          ! grep -R "racialsUsePartyFrame\|racialsPartyFrame\|racialsRaidFrame" KCDM/Modules/Racials.lua KCDM_Options/Racials.lua KCDM/Config/Defaults.lua KCDM_Options/ConfigKeys.lua
+          grep -q 'RacialsPartyAnchorMigration.lua' KCDM/Modules/embeds.xml
+          test ! -e KCDM_Options/RemovedControls.lua
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Remove redundant pickers and Racials party anchoring"
+          git push origin HEAD:arreglos-visuales
