@@ -155,7 +155,7 @@ ns.ConfigCreatePage = CreateCategoryPage
 
 local categoryHeaders = {
     { label = L["Display"], tabs = {"sizes", "positions", "border", "text", "glow"} },
-    { label = "CDM Icons", tabs = {"buffgroups", "bars", "layout"} },
+    { label = "CDM Icons", tabs = {"layout", "buffgroups", "bars"} },
     { label = L["Features"], tabs = {"racials", "resources", "defensives", "trinkets", "castbar"} },
     { label = L["Utility"], tabs = {"profiles", "importexport"} },
 }
@@ -164,7 +164,7 @@ local function CreateConfigFrame()
     if ConfigFrame then return end
 
     ConfigFrame = CreateFrame("Frame", "KCDMConfigFrame", UIParent, "SettingsFrameTemplate")
-    ConfigFrame:SetSize(920, 720)
+    ConfigFrame:SetSize(1120, 720)
     ConfigFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     ConfigFrame:SetFrameStrata("HIGH")
     ConfigFrame:Hide()
@@ -243,6 +243,7 @@ local function CreateConfigFrame()
     local panelBg = panelBgHolder:CreateTexture(nil, "BACKGROUND")
     panelBg:SetAtlas("Options_InnerFrame", true)
     panelBg:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 17, -64)
+    panelBg:SetPoint("BOTTOMRIGHT", ConfigFrame, "BOTTOMRIGHT", -17, 17)
 
     local gold = CDM_C.GOLD
 
