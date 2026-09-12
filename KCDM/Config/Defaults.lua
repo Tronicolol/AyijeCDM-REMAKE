@@ -166,24 +166,6 @@ CDM.defaults = {
     buffBarApplicationsOffsetX = 0,
     buffBarApplicationsOffsetY = 0,
 
-    -- Assist
-    rotationAssistEnabled = false,
-    rotationAssistGlowRatio = 0.33,
-    assistEnabled = false,
-    assistFontSize = 15,
-    assistColor = { r = 1, g = 1, b = 1, a = 1 },
-    assistPosition = "TOPRIGHT",
-    assistOffsetX = 0,
-    assistOffsetY = 0,
-
-    -- Press Overlay
-    pressOverlayEnabled = false,
-    pressOverlayTint = false,
-    pressOverlayTintColor = { r = 1, g = 1, b = 1, a = 0.35 },
-    pressOverlayHighlight = true,
-    pressOverlayBorder = false,
-    pressOverlayBorderColor = { r = 1, g = 1, b = 1, a = 1 },
-
     -- Module enable/disable toggles
     racialsEnabled = true,
     defensivesEnabled = true,
@@ -423,19 +405,4 @@ CDM.defaults = {
     chargeShowEdge  = false,
     chargeHideSwipe = false,
     chargeHideRechargeTimer = false,
-
-    -- Fading
-    fadingEnabled = false,
-    fadingTriggerNoTarget = true,
-    fadingTriggerOOC = false,
-    fadingTriggerMounted = false,
-    fadingOpacity = 30,
-    fadingEssential = true,
-    fadingUtility = true,
-    fadingBuffs = true,
-    fadingBuffBars = true,
-    fadingRacials = true,
-    fadingDefensives = true,
-    fadingTrinkets = true,
-    fadingResources = true,
 }
