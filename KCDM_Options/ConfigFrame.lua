@@ -156,7 +156,7 @@ ns.ConfigCreatePage = CreateCategoryPage
 local categoryHeaders = {
     { label = L["Display"], tabs = {"sizes", "positions", "border", "text", "glow"} },
     { label = "CDM Icons", tabs = {"layout", "buffgroups", "bars"} },
-    { label = L["Features"], tabs = {"racials", "resources", "defensives", "trinkets", "castbar"} },
+    { label = L["Features"], tabs = {"defensives", "racials", "resources", "trinkets", "castbar"} },
     { label = L["Utility"], tabs = {"profiles", "importexport"} },
 }
 

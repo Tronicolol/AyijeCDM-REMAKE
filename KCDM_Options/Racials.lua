@@ -265,7 +265,7 @@ local function CreateRacialsTab(page, tabId)
 
     page.controls.racialsEnabled = UI.CreateModernCheckbox(
         scrollChild,
-        L["Enable Racials"],
+        "Enable Items",
         enabled,
         function(checked)
             CDM.db.racialsEnabled = checked
@@ -444,4 +444,4 @@ local function CreateRacialsTab(page, tabId)
     setControlsEnabled(enabled)
 end
 
-API:RegisterConfigTab("racials", L["Racials"], CreateRacialsTab, 9)
+API:RegisterConfigTab("racials", "Items", CreateRacialsTab, 9)
