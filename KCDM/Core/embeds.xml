@@ -18,6 +18,4 @@
     <Script file="GlowDirector.lua"/>
     <Script file="InternalCallbacks.lua"/>
     <Script file="SpecChange.lua"/>
-    <Script file="Keybinds.lua"/>
-    <Script file="Fading.lua"/>
 </Ui>
