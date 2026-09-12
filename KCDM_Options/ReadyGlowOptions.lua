@@ -14,7 +14,7 @@ if Shared._readyGlowResourceAwareWrapped then return end
 local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
 Shared._readyGlowResourceAwareWrapped = true
 
-local NESTED_CHECKBOX_X = 30
+local NESTED_X = 40
 
 local function IsCooldownSpellTextConfig(cfg)
     local fields = cfg and cfg.fields
@@ -50,7 +50,7 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
                     end
                 end
             )
-            checkbox:SetPoint("TOPLEFT", NESTED_CHECKBOX_X, yOff)
+            checkbox:SetPoint("TOPLEFT", NESTED_X, yOff)
             yOff = yOff - 36
         end
     end
