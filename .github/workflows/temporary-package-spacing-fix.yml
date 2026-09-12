@@ -1,0 +1,32 @@
+name: Temporary package spacing fix
+
+on:
+  push:
+    branches:
+      - arreglos-visuales
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arreglos-visuales
+
+      - name: Build patch tree
+        shell: bash
+        run: |
+          mkdir -p patch/Interface/AddOns/KCDM_Options
+          cp KCDM_Options/Border.lua patch/Interface/AddOns/KCDM_Options/Border.lua
+          cp KCDM_Options/Defensives.lua patch/Interface/AddOns/KCDM_Options/Defensives.lua
+
+      - name: Upload patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ayije-arreglos-visuales-spacing-PATCH
+          path: patch
+          if-no-files-found: error
+          retention-days: 1
