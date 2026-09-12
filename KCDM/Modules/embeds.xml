@@ -12,6 +12,7 @@
     <Script file="BuffGroupPlaceholders.lua"/>
     <Script file="BuffGroups.lua"/>
     <Script file="BarGroups.lua"/>
+    <Script file="UnifiedBuffControls.lua"/>
     <Script file="BuffGroupOverlays.lua"/>
     <Script file="CooldownGroups.lua"/>
     <Script file="TargetAuraOverlay.lua"/>
@@ -23,4 +24,3 @@
     <Script file="PressOverlay.lua"/>
     <Script file="Externals.lua"/>
 </Ui>
-
