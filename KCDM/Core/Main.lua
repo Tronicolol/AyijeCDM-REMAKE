@@ -260,7 +260,6 @@ local function ActivateEditMode()
     CDM.isEditModeActive = true
     CDM:LockCooldownViewerEditModeFrames()
     CDM:UpdateEditModeSelectionOverlays()
-    CDM.Fading:ShowImmediate()
 end
 
 local function SetupEditModeIntegration()
@@ -268,7 +267,6 @@ local function SetupEditModeIntegration()
     EventRegistry:RegisterCallback("EditMode.Exit", function()
         CDM.isEditModeActive = false
         CDM:ForceReanchorAll()
-        CDM.Fading:Evaluate()
     end, CDM)
 
     local EditModeManagerFrame = _G.EditModeManagerFrame
@@ -362,10 +360,6 @@ local function InitializeModules()
     CDM.BuffGroups:Initialize()
     CDM.BuffGroupPlaceholders:Initialize()
     CDM.Glow:Initialize()
-    CDM.Keybinds:Initialize()
-    CDM.Fading:Initialize()
-    CDM.RotationAssist:Initialize()
-    CDM.PressOverlay:Initialize()
 end
 
 local function FlushCombatDirtyViewers()
@@ -416,7 +410,6 @@ local function ForceRestyleAll()
     local bbViewer = _G[VIEWERS.BUFF_BAR]
     if bbViewer then CDM:ForceReanchor(bbViewer) end
     CDM.RefreshAllSwipeColors()
-    CDM.Fading:ReapplyCurrent()
 end
 
 local function RegisterRefreshCallbacks()
