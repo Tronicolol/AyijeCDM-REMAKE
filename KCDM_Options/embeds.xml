@@ -3,6 +3,7 @@
     <Script file="UIHelpers.lua"/>
     <Script file="ConfigKeys.lua"/>
     <Script file="ConfigFrame.lua"/>
+    <Script file="WideFrameVisualFix.lua"/>
     <Script file="Sizes.lua"/>
     <Script file="Layout.lua"/>
     <Script file="Positions.lua"/>
