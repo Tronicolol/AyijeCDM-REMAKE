@@ -50,46 +50,6 @@ if type(UI.MakeSubPageScroll) == "function" then
     end
 end
 
-if type(UI.CreateModernSlider) == "function" then
-    local originalCreateModernSlider = UI.CreateModernSlider
-    UI.CreateModernSlider = function(parent, label, minVal, maxVal, currentVal, onValueChanged, labelWidth, sliderWidth)
-        local effectiveLabelWidth = labelWidth or 200
-        local effectiveSliderWidth = sliderWidth or 320
-        return originalCreateModernSlider(
-            parent,
-            label,
-            minVal,
-            maxVal,
-            currentVal,
-            onValueChanged,
-            effectiveLabelWidth,
-            effectiveSliderWidth
-        )
-    end
-end
-
-if type(UI.CreateModernSliderPrecise) == "function" then
-    local originalCreateModernSliderPrecise = UI.CreateModernSliderPrecise
-    UI.CreateModernSliderPrecise = function(parent, label, minVal, maxVal, currentVal, step, decimals, onValueChanged)
-        local panel = originalCreateModernSliderPrecise(parent, label, minVal, maxVal, currentVal, step, decimals, onValueChanged)
-        if panel then
-            panel:SetWidth(524)
-            if panel.Label then
-                panel.Label:SetWidth(200)
-            end
-            if panel.Slider then
-                panel.Slider:SetWidth(320)
-            end
-        end
-        return panel
-    end
-end
-
-if Shared then
-    Shared.SLIDER_LABEL_W = 150
-    Shared.SLIDER_W = 280
-end
-
 if Shared and type(Shared.CreateRightPanelManager) == "function" then
     local originalCreateRightPanelManager = Shared.CreateRightPanelManager
     Shared.CreateRightPanelManager = function(rightPanel, placeholder, destroyFrame)
