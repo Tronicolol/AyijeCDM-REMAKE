@@ -12,6 +12,8 @@ if Shared._perSpellGlowTypeWrapped then return end
 local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
 Shared._perSpellGlowTypeWrapped = true
 
+local NESTED_INDENT = 20
+
 local GLOW_TYPE_OPTIONS = {
     { value = "pixel", label = L["Pixel Glow"] },
     { value = "autocast", label = L["Autocast Glow"] },
@@ -54,53 +56,57 @@ end
 Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
     if IsCooldownSpellTextConfig(cfg) then
         local existingOv = cfg.existingOv
-        local selectedValue = existingOv and existingOv.glowTypeOverride or "global"
-        local options = BuildSpellGlowTypeOptions()
+        local readyGlowEnabled = existingOv and existingOv.readyGlowEnabled == true
 
-        local label = rc:CreateFontString(nil, "ARTWORK", "KCDM_Font14")
-        label:SetText(L["Glow Type"])
-        label:SetPoint("TOPLEFT", 0, yOff)
-        yOff = yOff - 24
+        if readyGlowEnabled then
+            local selectedValue = existingOv.glowTypeOverride or "global"
+            local options = BuildSpellGlowTypeOptions()
 
-        local dropdown
-        if cfg.createDropdown then
-            dropdown = cfg.createDropdown(rc)
-        else
-            dropdown = CreateFrame("DropdownButton", nil, rc, "WowStyle1DropdownTemplate")
-        end
-        dropdown:SetPoint("TOPLEFT", 0, yOff)
-        dropdown:SetWidth(200)
-        dropdown:SetDefaultText(UI.GetOptionLabel(options, selectedValue, options[1].label))
+            local label = rc:CreateFontString(nil, "ARTWORK", "KCDM_Font14")
+            label:SetText(L["Glow Type"])
+            label:SetPoint("TOPLEFT", NESTED_INDENT, yOff)
+            yOff = yOff - 24
 
-        UI.SetupValueDropdown(
-            dropdown,
-            options,
-            function()
-                local ov = cfg.existingOv
-                return ov and ov.glowTypeOverride or "global"
-            end,
-            function(value, optionLabel)
-                local ov = cfg.ensureOv and cfg.ensureOv()
-                if not ov then return end
-
-                ov.glowTypeOverride = value ~= "global" and value or nil
-                dropdown:SetDefaultText(optionLabel)
-
-                if cfg.save then
-                    cfg.save()
-                end
-
-                if Runtime.Glow and Runtime.Glow.RefreshSpellGlowTypeOverrides then
-                    Runtime.Glow:RefreshSpellGlowTypeOverrides()
-                end
-
-                if cfg.onToggle then
-                    cfg.onToggle()
-                end
+            local dropdown
+            if cfg.createDropdown then
+                dropdown = cfg.createDropdown(rc)
+            else
+                dropdown = CreateFrame("DropdownButton", nil, rc, "WowStyle1DropdownTemplate")
             end
-        )
+            dropdown:SetPoint("TOPLEFT", NESTED_INDENT, yOff)
+            dropdown:SetWidth(200)
+            dropdown:SetDefaultText(UI.GetOptionLabel(options, selectedValue, options[1].label))
 
-        yOff = yOff - 48
+            UI.SetupValueDropdown(
+                dropdown,
+                options,
+                function()
+                    local ov = cfg.existingOv
+                    return ov and ov.glowTypeOverride or "global"
+                end,
+                function(value, optionLabel)
+                    local ov = cfg.ensureOv and cfg.ensureOv()
+                    if not ov then return end
+
+                    ov.glowTypeOverride = value ~= "global" and value or nil
+                    dropdown:SetDefaultText(optionLabel)
+
+                    if cfg.save then
+                        cfg.save()
+                    end
+
+                    if Runtime.Glow and Runtime.Glow.RefreshSpellGlowTypeOverrides then
+                        Runtime.Glow:RefreshSpellGlowTypeOverrides()
+                    end
+
+                    if cfg.onToggle then
+                        cfg.onToggle()
+                    end
+                end
+            )
+
+            yOff = yOff - 48
+        end
     end
 
     return originalBuildTextOverrideWidgets(rc, yOff, cfg)
