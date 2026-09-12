@@ -49,7 +49,7 @@ local function CreateCroppedSidebarAtlas(frame, sidebar)
     local bottom = info.bottomTexCoord or 1
     local croppedRight = left + ((right - left) * ratio)
 
-    local texture = frame:CreateTexture(nil, "BACKGROUND", nil, -7)
+    local texture = frame:CreateTexture(nil, "BACKGROUND", nil, -5)
     texture:SetTexture(info.file)
     texture:SetPoint("TOPLEFT", frame, "TOPLEFT", 17, -64)
     texture:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 17, 17)
