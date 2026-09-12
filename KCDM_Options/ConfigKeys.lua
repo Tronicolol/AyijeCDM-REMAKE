@@ -13,7 +13,6 @@ ns.ConfigKeys = {
         "racials",
         "defensives",
         "trinkets",
-        "externals",
         "castbar",
         "glow",
         "positions",
@@ -209,16 +208,6 @@ ns.ConfigKeys = {
                 "trinketsMode",
                 "trinketsEssentialRow",
                 "trinketsEssentialPosition",
-            },
-        },
-        externals = {
-            label = "Externals Tracker Settings",
-            keys = {
-                "externalsEnabled",
-                "externalsIconWidth",
-                "externalsIconHeight",
-                "externalsCooldownFontSize",
-                "externalsDisableBlink",
             },
         },
         castbar = {
