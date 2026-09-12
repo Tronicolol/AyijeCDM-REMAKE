@@ -5,13 +5,16 @@ local ns = Runtime._OptionsNS
 local UI = ns and ns.ConfigUI
 local Shared = ns and ns.GroupEditorShared
 local L = Runtime.L
+local CDM_C = Runtime.CONST or {}
 if not ns or not UI or not Shared or type(Shared.BuildTextOverrideWidgets) ~= "function" then return end
 
 if ns.cdmUnifiedTextSectionHeadersHooked then return end
 ns.cdmUnifiedTextSectionHeadersHooked = true
 
 local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
-local SECTION_SPACE = 28
+local MAIN_HEADER_SPACE = 34
+local SECTION_SPACE = 42
+local SECTION_TITLE_OFFSET = 9
 
 local function CaptureObjects(parent)
     local objects = {}
@@ -102,11 +105,30 @@ local function FindCheckboxRow(objects, label)
     return nil
 end
 
+local function HasText(objects, text)
+    for _, object in ipairs(objects) do
+        if object.GetText and object:GetText() == text then
+            return true
+        end
+    end
+    return false
+end
+
+local function CreateMainTitle(parent, y)
+    local title = parent:CreateFontString(nil, "ARTWORK", "KCDM_Font18")
+    title:SetPoint("TOPLEFT", 0, y)
+    title:SetText(L["Text Overrides"] or "Text Overrides")
+
+    local gold = CDM_C.GOLD or { r = 1, g = 0.82, b = 0 }
+    title:SetTextColor(gold.r or 1, gold.g or 0.82, gold.b or 0, 1)
+    return title
+end
+
 local function CreateSectionTitle(parent, text, y)
-    local title = parent:CreateFontString(nil, "ARTWORK", "KCDM_Font14")
+    local title = parent:CreateFontString(nil, "ARTWORK", "KCDM_Font18")
     title:SetPoint("TOPLEFT", 0, y)
     title:SetText(text)
-    title:SetTextColor(0.64, 0.78, 0.92, 1)
+    title:SetTextColor(0.46, 0.72, 0.96, 1)
     return title
 end
 
@@ -120,15 +142,17 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
     end
 
     local objects = GetNewObjects(rc, before)
+    local overrideRow = FindCheckboxRow(objects, L["Override Text Settings"])
     local cooldownRow = FindCheckboxRow(objects, L["Hide Cooldown Timer"])
     local chargesRow = FindCheckboxRow(objects, L["Hide Charges"])
-    if not cooldownRow or not chargesRow then
+    if not overrideRow or not cooldownRow or not chargesRow then
         return resultY
     end
 
+    local overrideY = GetDirectAnchorY(overrideRow, rc)
     local cooldownY = GetDirectAnchorY(cooldownRow, rc)
     local chargesY = GetDirectAnchorY(chargesRow, rc)
-    if cooldownY == nil or chargesY == nil then
+    if overrideY == nil or cooldownY == nil or chargesY == nil then
         return resultY
     end
 
@@ -137,24 +161,50 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
         originalY[object] = GetDirectAnchorY(object, rc)
     end
 
+    local hasMainTitle = HasText(objects, L["Text Overrides"] or "Text Overrides")
+    local mainShift = hasMainTitle and 0 or -MAIN_HEADER_SPACE
+
     for _, object in ipairs(objects) do
         local objectY = originalY[object]
         if objectY ~= nil then
             local shift = 0
+
+            if not hasMainTitle and objectY <= overrideY then
+                shift = shift - MAIN_HEADER_SPACE
+            end
             if objectY <= cooldownY then
                 shift = shift - SECTION_SPACE
             end
             if objectY <= chargesY then
                 shift = shift - SECTION_SPACE
             end
+
             if shift ~= 0 then
                 ShiftDirectParentAnchors(object, rc, shift)
             end
         end
     end
 
-    CreateSectionTitle(rc, L["Cooldown Timer"] or "Cooldown Timer", cooldownY - 3)
-    CreateSectionTitle(rc, L["Charges"] or "Charges", chargesY - SECTION_SPACE - 3)
+    if not hasMainTitle then
+        CreateMainTitle(rc, overrideY - 2)
+    end
 
-    return resultY - (SECTION_SPACE * 2)
+    CreateSectionTitle(
+        rc,
+        L["Cooldown Timer"] or "Cooldown Timer",
+        cooldownY + mainShift - SECTION_TITLE_OFFSET
+    )
+
+    CreateSectionTitle(
+        rc,
+        L["Charges"] or "Charges",
+        chargesY + mainShift - SECTION_SPACE - SECTION_TITLE_OFFSET
+    )
+
+    local extraHeight = SECTION_SPACE * 2
+    if not hasMainTitle then
+        extraHeight = extraHeight + MAIN_HEADER_SPACE
+    end
+
+    return resultY - extraHeight
 end
