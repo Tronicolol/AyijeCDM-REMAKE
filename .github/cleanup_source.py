@@ -43,19 +43,11 @@ text = remove_between(
     "    local headerPool, groupContainerPool, emptyRowPool =\n",
     "Bars picker panel",
 )
-text = re.sub(
-    r"\n\s*if pickerActiveGroupIndex then\n"
-    r"\s*if pickerActiveGroupIndex == groupIndex then\n"
-    r"\s*pickerActiveGroupIndex = nil\n"
-    r"\s*ClearRightPanel\(\)\n"
-    r"\s*elseif pickerActiveGroupIndex > groupIndex then\n"
-    r"\s*pickerActiveGroupIndex = pickerActiveGroupIndex - 1\n"
-    r"\s*needReshow = true\n"
-    r"\s*end\n"
-    r"\s*end\n",
-    "\n",
+text = remove_between(
     text,
-    count=1,
+    "                if pickerActiveGroupIndex then\n",
+    "                local newExpanded = {}\n",
+    "Bars picker deletion bookkeeping",
 )
 text = text.replace(
     "                if needReshow then\n"
@@ -110,20 +102,25 @@ text = remove_between(
     "        if not btnRefs.customBuff then\n",
     "Buff Groups Add Icon button",
 )
-text = re.sub(
-    r"\n\s*if pickerActiveGroupIndex then\n.*?\n\s*end\n(?=\s*local newExpanded = \{\})",
-    "\n",
+text = text.replace(
+    "                if pickerActiveGroupIndex then\n"
+    "                    ShowSpellPickerPanel(pickerActiveGroupIndex)\n"
+    "                end\n",
+    "",
+)
+text = remove_between(
     text,
-    count=1,
-    flags=re.DOTALL,
+    "                        if pickerActiveGroupIndex then\n",
+    "                        if customBuffAddGroupIndex then\n",
+    "Buff Groups picker deletion bookkeeping",
 )
 text = text.replace(
-    "                if needReshow then\n"
-    "                    if pickerActiveGroupIndex then\n"
-    "                        ShowSpellPickerPanel(pickerActiveGroupIndex)\n"
-    "                    elseif selectedSpellID then\n",
-    "                if needReshow then\n"
-    "                    if selectedSpellID then\n",
+    "                        if needReshow then\n"
+    "                            if pickerActiveGroupIndex then\n"
+    "                                ShowSpellPickerPanel(pickerActiveGroupIndex)\n"
+    "                            elseif customBuffAddGroupIndex then\n",
+    "                        if needReshow then\n"
+    "                            if customBuffAddGroupIndex then\n",
 )
 assert_absent(
     text,
@@ -209,8 +206,11 @@ text = remove_between(
     "    setControlsEnabled = UI.SetupModuleToggle(scrollChild, page.controls.racialsEnabled)\n",
     "Racials options UpdateControls",
 )
+old_cooldown_header = '    local cooldownHeader = UI.CreateHeader(scrollChild, L["Cooldown"])\n'
+if text.count(old_cooldown_header) != 1:
+    raise RuntimeError("Racials options: cooldown header marker mismatch")
 text = text.replace(
-    '    local cooldownHeader = UI.CreateHeader(scrollChild, L["Cooldown"])\n',
+    old_cooldown_header,
     '    local cooldownHeader = UI.CreateHeader(scrollChild, L["Cooldown"], page.racialsOffsetYSlider, -30)\n',
     1,
 )
