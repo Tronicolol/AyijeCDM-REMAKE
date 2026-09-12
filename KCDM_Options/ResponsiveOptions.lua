@@ -85,15 +85,9 @@ if type(UI.CreateModernSliderPrecise) == "function" then
     end
 end
 
-if type(UI.CreateModernCheckbox) == "function" then
-    local originalCreateModernCheckbox = UI.CreateModernCheckbox
-    UI.CreateModernCheckbox = function(parent, label, initialValue, onChange, ...)
-        local frame = originalCreateModernCheckbox(parent, label, initialValue, onChange, ...)
-        if frame and frame.SetWidth then
-            frame:SetWidth(520)
-        end
-        return frame
-    end
+if Shared then
+    Shared.SLIDER_LABEL_W = 150
+    Shared.SLIDER_W = 280
 end
 
 if Shared and type(Shared.CreateRightPanelManager) == "function" then
@@ -109,20 +103,6 @@ if Shared and type(Shared.CreateRightPanelManager) == "function" then
             local sf, rc = originalCreateScrollContent(minHeight)
             local sc = sf and sf:GetScrollChild()
             FitScrollChild(sf, sc, 400, 18)
-            if sf and rc then
-                local function ResizeContent(width)
-                    width = tonumber(width) or sf:GetWidth() or 0
-                    if width > 1 then
-                        rc:SetWidth(math.max(400, width - 18))
-                    end
-                end
-                sf:HookScript("OnSizeChanged", function(_, width)
-                    ResizeContent(width)
-                end)
-                C_Timer.After(0, function()
-                    ResizeContent(sf:GetWidth())
-                end)
-            end
             return sf, rc
         end
 
