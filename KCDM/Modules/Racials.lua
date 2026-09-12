@@ -115,111 +115,6 @@ local function HasVisibleItemCooldown(startTime, duration)
     return startTime and duration and duration > CDM_C.ITEM_COOLDOWN_GCD_MIN
 end
 
-local function AnchorRacialsToPartyFrame(partyFrame, point, relativePoint, offsetX, offsetY)
-    if not (racialsContainer and partyFrame) then
-        return false
-    end
-
-    racialsContainer:ClearAllPoints()
-    CDM.Pixel.SetPoint(racialsContainer, point, partyFrame, relativePoint, offsetX, offsetY)
-    if not racialsContainer:IsShown() then
-        racialsContainer:Show()
-    end
-    return true
-end
-
-local PARTY_BUTTON_COUNT = 5
-
-local function IsVisibleFrame(frame)
-    return frame and frame.IsVisible and frame:IsVisible()
-end
-
-local function FindPlayerPartyButton(prefix, count)
-    for i = 1, count do
-        local frame = _G[prefix .. i]
-        if frame and frame.GetAttribute and frame:GetAttribute("unit") == "player"
-           and IsVisibleFrame(frame) then
-            return frame
-        end
-    end
-end
-
-local function FindGrid2PlayerButton()
-    for h = 1, 8 do
-        local prefix = "Grid2LayoutHeader" .. h
-        if not _G[prefix] then break end
-        for k = 1, PARTY_BUTTON_COUNT do
-            local btn = _G[prefix .. "UnitButton" .. k]
-            if not btn then break end
-            if btn.GetAttribute and btn:GetAttribute("unit") == "player"
-               and IsVisibleFrame(btn) then
-                return btn
-            end
-        end
-    end
-end
-
-local function GetDandersFrameForUnit(unit)
-    if not (C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.IsAddOnLoaded("DandersFrames")) then
-        return nil
-    end
-    if type(DandersFrames_IsReady) ~= "function" or not DandersFrames_IsReady() then
-        return nil
-    end
-    local getFrameForUnit = DandersFrames_GetFrameForUnit
-    if type(getFrameForUnit) ~= "function" then
-        return nil
-    end
-    local ok, frame = pcall(getFrameForUnit, unit)
-    if not ok then return nil end
-    return frame
-end
-
-local PARTY_FRAME_SOURCES = {
-    { addon = "ElvUI", prefix = "ElvUF_PartyGroup1UnitButton" },
-    { addon = "Cell",  prefix = "CellPartyFrameMember" },
-    { addon = "Grid2", fn = true },
-    { addon = nil,     prefix = "CompactPartyFrameMember" },
-    { addon = nil,     prefix = "CompactRaidFrame" },
-}
-
-local RAID_CONTAINER_SOURCES = {
-    { addon = "ElvUI", name = "ElvUF_Raid1" },
-    { addon = "Cell",  name = "CellRaidFrame" },
-    { addon = "Grid2", name = "Grid2LayoutFrame" },
-    { addon = nil,     name = "CompactRaidFrameContainer" },
-}
-
-local function ResolvePartyAnchorFrame()
-    local dandersFrame = GetDandersFrameForUnit("player")
-    if IsVisibleFrame(dandersFrame) then
-        return dandersFrame, "party"
-    end
-
-    if IsInRaid() then
-        for _, c in ipairs(RAID_CONTAINER_SOURCES) do
-            if not c.addon or C_AddOns.IsAddOnLoaded(c.addon) then
-                local f = _G[c.name]
-                if IsVisibleFrame(f) then
-                    return f, "raid"
-                end
-            end
-        end
-    else
-        for _, src in ipairs(PARTY_FRAME_SOURCES) do
-            if not src.addon or C_AddOns.IsAddOnLoaded(src.addon) then
-                local frame
-                if src.fn then
-                    frame = FindGrid2PlayerButton()
-                else
-                    frame = FindPlayerPartyButton(src.prefix, PARTY_BUTTON_COUNT)
-                end
-                if frame then return frame, "party" end
-            end
-        end
-    end
-end
-
 local racialsTrackerAcquireOpts = {
     size = nil,
     showCharges = true,
@@ -699,46 +594,8 @@ PlayerHasAbility = function(entry)
     return known
 end
 
-local racialsLastUsedPartyAnchor = false
-
 local function UpdateContainerPosition()
     if not racialsContainer then return end
-
-    local usePartyFrame = CDM.db and CDM.db.racialsUsePartyFrame or false
-
-    if usePartyFrame then
-        local partyFrame, mode = ResolvePartyAnchorFrame()
-
-        if partyFrame then
-            local point, relativePoint, offsetX, offsetY
-            if mode == "raid" then
-                point = CDM.db and CDM.db.racialsRaidFrameAnchorPoint or "BOTTOMLEFT"
-                relativePoint = CDM.db and CDM.db.racialsRaidFrameRelativePoint or "TOPLEFT"
-                offsetX = CDM.db and CDM.db.racialsRaidFrameOffsetX or 0
-                offsetY = CDM.db and CDM.db.racialsRaidFrameOffsetY or 0
-            else
-                local side = CDM.db and CDM.db.racialsPartyFrameSide or "LEFT"
-                if side == "LEFT" then
-                    point, relativePoint = "RIGHT", "LEFT"
-                else
-                    point, relativePoint = "LEFT", "RIGHT"
-                end
-                offsetX = CDM.db and CDM.db.racialsPartyFrameOffsetX or -1
-                offsetY = CDM.db and CDM.db.racialsPartyFrameOffsetY or 20
-            end
-
-            if AnchorRacialsToPartyFrame(partyFrame, point, relativePoint, offsetX, offsetY) then
-                racialsLastUsedPartyAnchor = true
-                return
-            end
-        end
-    end
-
-    if racialsLastUsedPartyAnchor then
-        racialsLastUsedPartyAnchor = false
-        CDM.InvalidateTrackerAnchorCache(racialsContainer)
-        CDM.ScheduleTrackerPositionRefresh()
-    end
 
     local anchorPoint = CDM.db and CDM.db.racialsAnchorPoint or "TOPLEFT"
     local offsetX = CDM.db and CDM.db.racialsOffsetX or 0

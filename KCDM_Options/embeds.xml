@@ -35,5 +35,4 @@
     <Script file="Resources.lua"/>
     <Script file="Bars.lua"/>
     <Script file="CastBar.lua"/>
-    <Script file="RemovedControls.lua"/>
 </Ui>

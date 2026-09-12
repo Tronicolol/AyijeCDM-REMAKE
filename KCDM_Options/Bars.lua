@@ -169,7 +169,6 @@ local function CreateBarsTab(page)
     local renameLastClickGroup = nil
     local renameActiveGroupIndex = nil
     local renameActiveEditBox = nil
-    local pickerActiveGroupIndex = nil
 
     local _helpers = Shared.CreateGroupEditorHelpers({
         dbKey = "barGroups",
@@ -203,110 +202,6 @@ local function CreateBarsTab(page)
 
     local function RefreshLeftPanelIfNeeded()
         if RefreshAll then RefreshAll() end
-    end
-
-    local function GetViewerSpellListForSpec(specID)
-        if specID ~= playerSpecID then
-            local seen, list = {}, {}
-            local function AddCached(raw)
-                if not raw then return end
-                for _, entry in ipairs(raw) do
-                    local cdID = entry.cooldownID
-                    local sid = entry.spellID
-                    if sid and cdID and not seen[cdID] then
-                        seen[cdID] = true
-                        list[#list + 1] = { cdID = cdID, spellID = sid }
-                    end
-                end
-            end
-            AddCached(API:GetSpecBarSpellCache(specID))
-            AddCached(API:GetSpecBuffSpellCache(specID))
-            return list
-        end
-
-        local seen, list = {}, {}
-        local function AddByCooldownID(cdID, info)
-            if not cdID or seen[cdID] then return end
-            info = info or C_CooldownViewer.GetCooldownViewerCooldownInfo(cdID)
-            if not info then return end
-            local sid = info.overrideTooltipSpellID or info.overrideSpellID or info.spellID
-            if not sid then return end
-            seen[cdID] = true
-            list[#list + 1] = { cdID = cdID, spellID = sid }
-        end
-
-        local provider = CooldownViewerSettings and CooldownViewerSettings.GetDataProvider
-                         and CooldownViewerSettings:GetDataProvider()
-        if provider and provider.GetOrderedCooldownIDs then
-            local cats = Enum.CooldownViewerCategory
-            local TrackedBuff, TrackedBar, HiddenAura = cats.TrackedBuff, cats.TrackedBar, cats.HiddenAura
-            for _, cdID in ipairs(provider:GetOrderedCooldownIDs()) do
-                local info = provider:GetCooldownInfoForID(cdID)
-                if info and (info.category == TrackedBuff
-                          or info.category == TrackedBar
-                          or info.category == HiddenAura) then
-                    AddByCooldownID(cdID, info)
-                end
-            end
-        else
-            for _, cat in ipairs({
-                Enum.CooldownViewerCategory.TrackedBar,
-                Enum.CooldownViewerCategory.TrackedBuff,
-            }) do
-                local ids = C_CooldownViewer.GetCooldownViewerCategorySet(cat, true)
-                if ids then
-                    for _, cdID in ipairs(ids) do AddByCooldownID(cdID) end
-                end
-            end
-        end
-
-        API:ForEachActiveFrame({ "BuffBarCooldownViewer" }, function(frame)
-            AddByCooldownID(frame.cooldownID)
-        end)
-
-        return list
-    end
-
-    local function GetUntrackedViewerSpellListForCurrentSpec()
-        local activeCdIDSet = {}
-        API:ForEachActiveFrame({ "BuffBarCooldownViewer" }, function(frame)
-            if frame.cooldownID then activeCdIDSet[frame.cooldownID] = true end
-        end)
-        local all = GetViewerSpellListForSpec(playerSpecID)
-        local result = {}
-        for _, slot in ipairs(all) do
-            if not activeCdIDSet[slot.cdID] then result[#result + 1] = slot end
-        end
-        return result
-    end
-
-    local function GetAvailableSpellsForPicker(specID)
-        local allSlots = (specID == playerSpecID)
-            and GetUntrackedViewerSpellListForCurrentSpec()
-            or GetViewerSpellListForSpec(specID)
-        local assigned = {}
-        local groups = CDM.db.barGroups and CDM.db.barGroups[specID]
-        if groups then
-            for _, group in ipairs(groups) do
-                for _, sid in ipairs(group.spells or {}) do
-                    Shared.MarkEquivalentSpellIDs(assigned, sid)
-                end
-            end
-        end
-        local seen = {}
-        local result = {}
-        for _, slot in ipairs(allSlots) do
-            local spellID = slot.spellID
-            if not Shared.HasEquivalentSpellID(assigned, spellID) and not seen[slot.cdID] then
-                seen[slot.cdID] = true
-                local name = C_Spell.GetSpellName(spellID) or ("Spell " .. spellID)
-                local icon = C_Spell.GetSpellTexture(spellID)
-                local isKnown = IsPlayerSpell(spellID)
-                result[#result + 1] = { spellID = spellID, name = name, icon = icon, isKnown = isKnown }
-            end
-        end
-        table.sort(result, function(a, b) return a.name < b.name end)
-        return result
     end
 
     local function MarkSafe(set, id)
@@ -489,7 +384,6 @@ local function CreateBarsTab(page)
     local RegisterRightPanelDropdown = rightPanelManager.RegisterDropdown
     local CreateRightScrollContent = rightPanelManager.CreateScrollContent
     local ClearRightPanel = function()
-        pickerActiveGroupIndex = nil
         rightPanelManager.Clear()
         rightPanel:SetHeight(PLACEHOLDER_HEIGHT)
     end
@@ -823,7 +717,6 @@ local function CreateBarsTab(page)
     end
 
     ShowGroupSettings = function(groupIndex)
-        pickerActiveGroupIndex = nil
         local groups = GetSpecGroups()
         if not groups or not groups[groupIndex] then ClearRightPanel(); return end
         local _, rc = CreateRightScrollContent(1600)
@@ -831,7 +724,6 @@ local function CreateBarsTab(page)
     end
 
     local ShowUngroupedSettings = function()
-        pickerActiveGroupIndex = nil
         selectedGroupIndex = nil
         selectedSpellID = nil
         selectedSpellGroupIndex = nil
@@ -1005,51 +897,12 @@ local function CreateBarsTab(page)
     end
 
     ShowSpellSettings = function(spellID, groupIndex)
-        pickerActiveGroupIndex = nil
         selectedSpellID = spellID
         selectedSpellGroupIndex = groupIndex
         local _, rc = CreateRightScrollContent(500)
         local h = RenderSpellOverrideSettings(rc, nil, groupIndex, spellID)
         if rc.SetHeight then rc:SetHeight(h + 40) end
         FitRightPanel(h + 40)
-    end
-
-    local function ShowSpellPickerPanel(groupIndex)
-        pickerActiveGroupIndex = groupIndex
-        local spells = GetAvailableSpellsForPicker(currentSpecID)
-        local pickerRc = Shared.RenderSpellPicker({
-            createRightScrollContent = function(h) return CreateRightScrollContent(h) end,
-            minHeight = 700,
-            headerText = L["Add Spell"],
-            headerColor = CDM_C.GOLD or { r = 1, g = 0.82, b = 0 },
-            spells = spells,
-            emptyText = L["No more bar-trackable spells available for this spec."],
-            cacheMissingText = L["Spell cache missing for this spec."],
-            isCacheMissing = currentSpecID ~= playerSpecID
-                and not API:GetSpecBarSpellCache(currentSpecID)
-                and not API:GetSpecBuffSpellCache(currentSpecID),
-            currentSpecID = currentSpecID,
-            playerSpecID = playerSpecID,
-            doneText = L["Back"],
-            onSelect = function(spellID)
-                local groups = EnsureBarGroups()
-                if not groups then return end
-                if groupIndex then
-                    local gd = groups[groupIndex]
-                    if gd then
-                        if not gd.spells then gd.spells = {} end
-                        Shared.AddSpellToGroupList(gd.spells, spellID)
-                    end
-                end
-                SaveAndRefresh()
-                RefreshLeftPanelIfNeeded()
-                ShowSpellSettings(spellID, groupIndex)
-            end,
-            onDone = function()
-                if groupIndex then ShowGroupSettings(groupIndex) else ClearRightPanel() end
-            end,
-        })
-        if pickerRc and pickerRc.GetHeight then FitRightPanel(pickerRc:GetHeight() + 40) end
     end
 
     local headerPool, groupContainerPool, emptyRowPool =
@@ -1201,15 +1054,6 @@ local function CreateBarsTab(page)
                         needReshow = true
                     end
                 end
-                if pickerActiveGroupIndex then
-                    if pickerActiveGroupIndex == groupIndex then
-                        pickerActiveGroupIndex = nil
-                        ClearRightPanel()
-                    elseif pickerActiveGroupIndex > groupIndex then
-                        pickerActiveGroupIndex = pickerActiveGroupIndex - 1
-                        needReshow = true
-                    end
-                end
                 local newExpanded = {}
                 for idx, val in pairs(expandedGroups) do
                     if idx < groupIndex then
@@ -1222,9 +1066,7 @@ local function CreateBarsTab(page)
                 SaveAndRefresh()
                 RefreshAll()
                 if needReshow then
-                    if pickerActiveGroupIndex then
-                        ShowSpellPickerPanel(pickerActiveGroupIndex)
-                    elseif selectedSpellID then
+                    if selectedSpellID then
                         ShowSpellSettings(selectedSpellID, selectedSpellGroupIndex)
                     elseif selectedGroupIndex then
                         ShowGroupSettings(selectedGroupIndex)
@@ -1518,20 +1360,6 @@ local function CreateBarsTab(page)
             end)
             btnRefs.group = addGroupBtn
         end
-
-        if not btnRefs.spell then
-            local addSpellBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-            addSpellBtn:SetSize(110, 22)
-            addSpellBtn:SetText(L["Add Spell"])
-            addSpellBtn:SetScript("OnClick", function()
-                if selectedGroupIndex then
-                    ShowSpellPickerPanel(selectedGroupIndex)
-                end
-            end)
-            btnRefs.spell = addSpellBtn
-        end
-        btnRefs.spell:SetPoint("LEFT", btnRefs.group, "RIGHT", 6, 0)
-        btnRefs.spell:SetEnabled(selectedGroupIndex ~= nil)
 
         leftChild:SetHeight(math.max(800, -yOff + 40))
     end

@@ -59,7 +59,6 @@ local function CreateBuffGroupsTab(page)
     local renameLastClickGroup = nil
     local renameActiveGroupIndex = nil
     local renameActiveEditBox = nil
-    local pickerActiveGroupIndex = nil
     local customBuffAddGroupIndex = nil
 
     local _helpers = Shared.CreateGroupEditorHelpers({
@@ -242,113 +241,8 @@ local function CreateBuffGroupsTab(page)
     local RegisterRightPanelDropdown = rightPanelManager.RegisterDropdown
     local CreateRightScrollContent = rightPanelManager.CreateScrollContent
     local ClearRightPanel = function()
-        pickerActiveGroupIndex = nil
         customBuffAddGroupIndex = nil
         rightPanelManager.Clear()
-    end
-
-    local function GetViewerSpellListForSpec(specID)
-        if specID == playerSpecID then
-            local seen, list = {}, {}
-            local ids = C_CooldownViewer.GetCooldownViewerCategorySet(Enum.CooldownViewerCategory.TrackedBuff, true)
-            if ids then
-                for _, cdID in ipairs(ids) do
-                    if not seen[cdID] then
-                        seen[cdID] = true
-                        local info = C_CooldownViewer.GetCooldownViewerCooldownInfo(cdID)
-                        if info then
-                            local sid = info.overrideTooltipSpellID or info.overrideSpellID or info.spellID
-                            if sid then
-                                list[#list + 1] = { cdID = cdID, spellID = sid }
-                            end
-                        end
-                    end
-                end
-            end
-            return list
-        else
-            local raw = API:GetSpecBuffSpellCache(specID)
-            if not raw then return {} end
-            local seen, list = {}, {}
-            for _, entry in ipairs(raw) do
-                local cdID = entry.cooldownID
-                local sid = entry.spellID
-                if sid and cdID and not seen[cdID] then
-                    seen[cdID] = true
-                    list[#list + 1] = { cdID = cdID, spellID = sid }
-                end
-            end
-            return list
-        end
-    end
-
-    local function GetUntrackedViewerSpellListForCurrentSpec()
-        local activeSet = {}
-        API:ForEachActiveFrame({ CDM_C.VIEWERS.BUFF }, function(frame)
-            local activeID = frame.cdmBuffCategorySpellID
-            if not IsSafeNumber(activeID) then
-                local info = frame.GetCooldownInfo and frame:GetCooldownInfo() or frame.cooldownInfo
-                if info then
-                    activeID = info.overrideTooltipSpellID or info.overrideSpellID or info.spellID
-                end
-            end
-            if not IsSafeNumber(activeID) then
-                activeID = frame.GetBaseSpellID and frame:GetBaseSpellID()
-            end
-            if IsSafeNumber(activeID) then
-                activeSet[activeID] = true
-            end
-        end)
-        local seen, list = {}, {}
-        local ids = C_CooldownViewer.GetCooldownViewerCategorySet(Enum.CooldownViewerCategory.TrackedBuff, true)
-        if ids then
-            for _, cdID in ipairs(ids) do
-                if not seen[cdID] then
-                    seen[cdID] = true
-                    local info = C_CooldownViewer.GetCooldownViewerCooldownInfo(cdID)
-                    if info then
-                        local sid = info.overrideTooltipSpellID or info.overrideSpellID or info.spellID
-                        if sid and not activeSet[sid] then
-                            list[#list + 1] = { cdID = cdID, spellID = sid }
-                        end
-                    end
-                end
-            end
-        end
-        return list
-    end
-
-    local function GetAvailableSpellsForPicker(specID)
-        local allSlots = (specID == playerSpecID)
-            and GetUntrackedViewerSpellListForCurrentSpec()
-            or GetViewerSpellListForSpec(specID)
-        local assigned = {}
-        local groups = CDM.db.buffGroups and CDM.db.buffGroups[specID]
-        if groups then
-            for _, group in ipairs(groups) do
-                for _, sid in ipairs(group.spells or {}) do
-                    Shared.MarkEquivalentSpellIDs(assigned, sid)
-                end
-            end
-        end
-        local hiddenBuffSet = CDM.resourcesHiddenBuffSet
-        local seen = {}
-        local result = {}
-        for _, slot in ipairs(allSlots) do
-            local spellID = slot.spellID
-            if not Shared.HasEquivalentSpellID(assigned, spellID)
-                and not seen[slot.cdID]
-                and not Shared.HasEquivalentSpellID(hiddenBuffSet, spellID)
-            then
-                seen[slot.cdID] = true
-                local name = C_Spell.GetSpellName(spellID) or ("Spell " .. spellID)
-                local icon = C_Spell.GetSpellTexture(spellID)
-                local isKnown = IsPlayerSpell(spellID)
-                result[#result + 1] = { spellID = spellID, name = name, icon = icon, isKnown = isKnown }
-            end
-        end
-        table.sort(result, function(a, b) return a.name < b.name end)
-        return result
     end
 
     local function GetUngroupedBuffSpellsFromCache(specID)
@@ -390,7 +284,6 @@ local function CreateBuffGroupsTab(page)
     end
 
     local function ShowGroupSettings(groupIndex)
-        pickerActiveGroupIndex = nil
         customBuffAddGroupIndex = nil
         local groups = GetSpecGroups()
         if not groups or not groups[groupIndex] then ClearRightPanel(); return end
@@ -772,7 +665,6 @@ local function CreateBuffGroupsTab(page)
     end
 
     ShowSpellSettings = function(spellID, groupIndex)
-        pickerActiveGroupIndex = nil
         customBuffAddGroupIndex = nil
         if not spellID or not currentSpecID then
             ClearRightPanel()
@@ -1007,7 +899,6 @@ local function CreateBuffGroupsTab(page)
     end
 
     local btnRefs = {}
-    local ShowSpellPickerPanel
     local ShowCustomBuffAddPanel
 
     local headerPool, groupContainerPool, emptyRowPool, spellRowPool =
@@ -1030,58 +921,6 @@ local function CreateBuffGroupsTab(page)
     UI.SetTextFaint(ungroupedCacheMessage)
     ungroupedCacheMessage:Hide()
 
-    local function UpdateAddIconButtonState()
-        if btnRefs.icon then
-            btnRefs.icon:SetEnabled(selectedGroupIndex ~= nil)
-        end
-    end
-
-    ShowSpellPickerPanel = function(groupIndex)
-        pickerActiveGroupIndex = groupIndex
-        customBuffAddGroupIndex = nil
-        local groups = GetSpecGroups()
-        if not groups or not groups[groupIndex] then return end
-        local gd = groups[groupIndex]
-        local spells = GetAvailableSpellsForPicker(currentSpecID)
-        Shared.RenderSpellPicker({
-            createRightScrollContent = CreateRightScrollContent,
-            headerText = (L["Add Spell to:"]) .. " " .. (gd.name or "Group"),
-            headerColor = CDM_C.GOLD,
-            spells = spells,
-            currentSpecID = currentSpecID,
-            playerSpecID = playerSpecID,
-            isCacheMissing = currentSpecID ~= playerSpecID and not API:GetSpecBuffSpellCache(currentSpecID),
-            cacheMissingText = string.format(L["Log %s to build spell list"], select(2, GetSpecializationInfoByID(currentSpecID)) or "this spec"),
-            emptyText = currentSpecID == playerSpecID
-                and (L["No untracked buff icons available for this spec"])
-                or (L["All available icons are assigned to groups"]),
-            onSelect = function(sid)
-                local currentGroups = EnsureBuffGroups()
-                if not currentGroups or not currentGroups[groupIndex] then return end
-                if not currentGroups[groupIndex].spells then
-                    currentGroups[groupIndex].spells = {}
-                end
-                Shared.AddSpellToGroupList(currentGroups[groupIndex].spells, sid)
-                local specOv = EnsureUngroupedOverrides()
-                if specOv then
-                    local ovData = ExtractMergedOverrideEntry(specOv, sid)
-                    if ovData then
-                        if not currentGroups[groupIndex].spellOverrides then
-                            currentGroups[groupIndex].spellOverrides = {}
-                        end
-                        StoreMergedOverrideEntry(currentGroups[groupIndex].spellOverrides, sid, ovData)
-                    end
-                end
-                SaveAndRefresh()
-                RefreshLeftPanelIfNeeded()
-                ShowSpellPickerPanel(groupIndex)
-            end,
-            onDone = function()
-                ShowGroupSettings(groupIndex)
-            end,
-        })
-    end
-
     GetCustomBuffEntry = function(spellID)
         return CDM.db and CDM.db.customBuffRegistry and CDM.db.customBuffRegistry[spellID]
     end
@@ -1091,7 +930,6 @@ local function CreateBuffGroupsTab(page)
     end
 
     ShowCustomBuffAddPanel = function(targetGroupIndex)
-        pickerActiveGroupIndex = nil
         customBuffAddGroupIndex = targetGroupIndex
         local _, rc = CreateRightScrollContent(500)
         local yOff = 0
@@ -1359,9 +1197,6 @@ local function CreateBuffGroupsTab(page)
                 end
                 SaveAndRefresh()
                 RefreshLeftPanelIfNeeded()
-                if pickerActiveGroupIndex then
-                    ShowSpellPickerPanel(pickerActiveGroupIndex)
-                end
             end)
         end
 
@@ -1536,20 +1371,6 @@ local function CreateBuffGroupsTab(page)
             end)
             btnRefs.group = addGroupBtn
         end
-
-        if not btnRefs.icon then
-            local addIconBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
-            addIconBtn:SetSize(90, 22)
-            addIconBtn:SetText(L["Add Icon"])
-            addIconBtn:SetScript("OnClick", function()
-                if selectedGroupIndex then
-                    ShowSpellPickerPanel(selectedGroupIndex)
-                end
-            end)
-            btnRefs.icon = addIconBtn
-        end
-        btnRefs.icon:SetPoint("LEFT", btnRefs.group, "RIGHT", 6, 0)
-        btnRefs.icon:SetEnabled(selectedGroupIndex ~= nil)
 
         if not btnRefs.customBuff then
             local addCustomBuffBtn = CreateFrame("Button", nil, page, "UIPanelButtonTemplate")
@@ -1842,15 +1663,6 @@ local function CreateBuffGroupsTab(page)
                                 needReshow = true
                             end
                         end
-                        if pickerActiveGroupIndex then
-                            if pickerActiveGroupIndex == groupIndex then
-                                pickerActiveGroupIndex = nil
-                                ClearRightPanel()
-                            elseif pickerActiveGroupIndex > groupIndex then
-                                pickerActiveGroupIndex = pickerActiveGroupIndex - 1
-                                needReshow = true
-                            end
-                        end
                         if customBuffAddGroupIndex then
                             if customBuffAddGroupIndex == groupIndex then
                                 customBuffAddGroupIndex = nil
@@ -1872,9 +1684,7 @@ local function CreateBuffGroupsTab(page)
                         SaveAndRefresh()
                         RefreshLeftPanelIfNeeded()
                         if needReshow then
-                            if pickerActiveGroupIndex then
-                                ShowSpellPickerPanel(pickerActiveGroupIndex)
-                            elseif customBuffAddGroupIndex then
+                            if customBuffAddGroupIndex then
                                 ShowCustomBuffAddPanel(customBuffAddGroupIndex)
                             elseif selectedSpellID then
                                 ShowSpellSettings(selectedSpellID, selectedSpellGroupIndex)
@@ -1938,7 +1748,6 @@ local function CreateBuffGroupsTab(page)
         end
 
         lc:SetHeight(math.abs(yOff) + 4)
-        UpdateAddIconButtonState()
     end
 
     RefreshAll = function()

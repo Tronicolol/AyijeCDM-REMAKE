@@ -6,7 +6,7 @@
     <Script file="WhirlwindResource.lua"/>
     <Script file="Tags.lua"/>
     <Script file="Racials.lua"/>
-    <Script file="RacialsPartyAnchorRemoval.lua"/>
+    <Script file="RacialsPartyAnchorMigration.lua"/>
     <Script file="Defensives.lua"/>
     <Script file="Trinkets.lua"/>
     <Script file="CustomBuffs.lua"/>

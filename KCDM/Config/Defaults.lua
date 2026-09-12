@@ -223,16 +223,6 @@ CDM.defaults = {
     trinketsEssentialRow = 1,           -- 1 or 2 (which row trinkets appear in)
     trinketsEssentialPosition = "end",  -- "start" or "end"
 
-    -- Party frame anchoring settings
-    racialsUsePartyFrame = false,
-    racialsPartyFrameSide = "LEFT",
-    racialsPartyFrameOffsetX = -1,
-    racialsPartyFrameOffsetY = 20,
-    racialsRaidFrameAnchorPoint = "BOTTOMLEFT",
-    racialsRaidFrameRelativePoint = "TOPLEFT",
-    racialsRaidFrameOffsetX = 0,
-    racialsRaidFrameOffsetY = 0,
-
     -- Per-bar resource settings (schema v9)
     resourceBarSettings = {},
 
