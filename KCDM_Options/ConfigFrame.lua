@@ -243,7 +243,7 @@ local function CreateConfigFrame()
     local panelBg = panelBgHolder:CreateTexture(nil, "BACKGROUND")
     panelBg:SetAtlas("Options_InnerFrame", true)
     panelBg:SetPoint("TOPLEFT", ConfigFrame, "TOPLEFT", 17, -64)
-    panelBg:SetPoint("BOTTOMRIGHT", ConfigFrame, "BOTTOMRIGHT", -17, 17)
+    panelBg:SetPoint("BOTTOMLEFT", ConfigFrame, "BOTTOMLEFT", 17, 17)
 
     local gold = CDM_C.GOLD
 
