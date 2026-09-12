@@ -2,31 +2,27 @@ local Runtime = _G["KCDM"]
 if not Runtime then return end
 
 local ns = Runtime._OptionsNS
-local UI = ns and ns.ConfigUI
 local Shared = ns and ns.GroupEditorShared
 local L = Runtime.L
 local CDM_C = Runtime.CONST or {}
-if not ns or not UI or not Shared or type(Shared.BuildTextOverrideWidgets) ~= "function" then return end
+if not ns or not Shared or type(Shared.BuildTextOverrideWidgets) ~= "function" then return end
 
 if ns.cdmUnifiedTextSectionHeadersHooked then return end
 ns.cdmUnifiedTextSectionHeadersHooked = true
 
 local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
-local MAIN_TITLE_SPACE = 34
-local SECTION_SPACE = 42
-local SECTION_TITLE_GAP = 30
-local SECTION_INDENT = 18
+local NESTED_INDENT = 20
+local SECTION_TITLE_SPACE = 32
+local SECTION_TITLE_GAP = 26
 
 local function CaptureObjects(parent)
     local objects = {}
 
-    local children = { parent:GetChildren() }
-    for _, object in ipairs(children) do
+    for _, object in ipairs({ parent:GetChildren() }) do
         objects[object] = true
     end
 
-    local regions = { parent:GetRegions() }
-    for _, object in ipairs(regions) do
+    for _, object in ipairs({ parent:GetRegions() }) do
         objects[object] = true
     end
 
@@ -36,15 +32,13 @@ end
 local function GetNewObjects(parent, before)
     local objects = {}
 
-    local children = { parent:GetChildren() }
-    for _, object in ipairs(children) do
+    for _, object in ipairs({ parent:GetChildren() }) do
         if not before[object] then
             objects[#objects + 1] = object
         end
     end
 
-    local regions = { parent:GetRegions() }
-    for _, object in ipairs(regions) do
+    for _, object in ipairs({ parent:GetRegions() }) do
         if not before[object] then
             objects[#objects + 1] = object
         end
@@ -119,21 +113,13 @@ local function FindTextRegion(objects, text)
     return nil
 end
 
-local function CreateMainTitle(parent, y)
+local function CreateSectionTitle(parent, text, y)
     local title = parent:CreateFontString(nil, "ARTWORK", "KCDM_Font18")
-    title:SetPoint("TOPLEFT", SECTION_INDENT, y)
-    title:SetText(L["Text Overrides"] or "Text Overrides")
+    title:SetPoint("TOPLEFT", NESTED_INDENT, y)
+    title:SetText(text)
 
     local gold = CDM_C.GOLD or { r = 1, g = 0.82, b = 0 }
     title:SetTextColor(gold.r or 1, gold.g or 0.82, gold.b or 0, 1)
-    return title
-end
-
-local function CreateSectionTitle(parent, text, y)
-    local title = parent:CreateFontString(nil, "ARTWORK", "KCDM_Font18")
-    title:SetPoint("TOPLEFT", SECTION_INDENT, y)
-    title:SetText(text)
-    title:SetTextColor(0.46, 0.72, 0.96, 1)
     return title
 end
 
@@ -152,12 +138,12 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
         return resultY
     end
 
-    local mainText = L["Text Overrides"] or "Text Overrides"
-    local mainTitle = FindTextRegion(objects, mainText)
-    local mainTitleY = mainTitle and GetDirectAnchorY(mainTitle, rc) or nil
+    local mainTitle = FindTextRegion(objects, L["Text Overrides"] or "Text Overrides")
     local reclaim = 0
-    if mainTitleY ~= nil and mainTitleY > overrideY then
-        reclaim = math.max(0, mainTitleY - overrideY)
+
+    if mainTitle then
+        mainTitle:Hide()
+        reclaim = yOff - overrideY
     end
 
     local cooldownRow = FindCheckboxRow(objects, L["Hide Cooldown Timer"])
@@ -178,20 +164,20 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
                 local shiftY = 0
                 local shiftX = 0
 
-                if reclaim > 0 and objectY <= overrideY then
+                if objectY <= overrideY then
                     shiftY = shiftY + reclaim
                 end
 
                 if expanded and objectY <= cooldownY then
-                    shiftY = shiftY - MAIN_TITLE_SPACE - SECTION_SPACE
+                    shiftY = shiftY - SECTION_TITLE_SPACE
                 end
 
                 if expanded and objectY <= chargesY then
-                    shiftY = shiftY - SECTION_SPACE
+                    shiftY = shiftY - SECTION_TITLE_SPACE
                 end
 
                 if expanded and objectY < overrideY then
-                    shiftX = SECTION_INDENT
+                    shiftX = NESTED_INDENT
                 end
 
                 if shiftY ~= 0 or shiftX ~= 0 then
@@ -201,22 +187,12 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
         end
     end
 
-    local finalOverrideY = overrideY + reclaim
-    local mainTitleTargetY = finalOverrideY - MAIN_TITLE_SPACE
-
-    if mainTitle then
-        mainTitle:ClearAllPoints()
-        mainTitle:SetPoint("TOPLEFT", SECTION_INDENT, mainTitleTargetY)
-    else
-        mainTitle = CreateMainTitle(rc, mainTitleTargetY)
-    end
-
     if not expanded then
-        return resultY + reclaim - MAIN_TITLE_SPACE
+        return resultY + reclaim
     end
 
-    local finalCooldownY = cooldownY + reclaim - MAIN_TITLE_SPACE - SECTION_SPACE
-    local finalChargesY = chargesY + reclaim - MAIN_TITLE_SPACE - (SECTION_SPACE * 2)
+    local finalCooldownY = cooldownY + reclaim - SECTION_TITLE_SPACE
+    local finalChargesY = chargesY + reclaim - (SECTION_TITLE_SPACE * 2)
 
     CreateSectionTitle(
         rc,
@@ -230,5 +206,5 @@ Shared.BuildTextOverrideWidgets = function(rc, yOff, cfg)
         finalChargesY + SECTION_TITLE_GAP
     )
 
-    return resultY + reclaim - MAIN_TITLE_SPACE - (SECTION_SPACE * 2)
+    return resultY + reclaim - (SECTION_TITLE_SPACE * 2)
 end
