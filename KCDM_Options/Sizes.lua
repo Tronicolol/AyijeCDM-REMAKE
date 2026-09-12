@@ -6,6 +6,8 @@ local CDM = Runtime
 local UI = ns.ConfigUI
 local L = Runtime.L
 
+local SECTION_GAP = 30
+
 local function SetSizeField(key, field, value)
     local current = CDM.db[key]
     local updated = { w = current.w, h = current.h }
@@ -28,7 +30,7 @@ local function CreateSizesTab(page, tabId)
     page.controls.s4:SetPoint("TOPLEFT", page.controls.s3, "BOTTOMLEFT", 0, -10)
 
     local utilityHeader = UI.CreateHeader(page, L["Utility"])
-    utilityHeader:SetPoint("TOPLEFT", page.controls.s4, "BOTTOMLEFT", 0, -15)
+    utilityHeader:SetPoint("TOPLEFT", page.controls.s4, "BOTTOMLEFT", 0, -SECTION_GAP)
 
     page.controls.s5 = UI.CreateModernSlider(page, L["Width"], 20, 100, CDM.db.sizeUtility.w, function(v) SetSizeField("sizeUtility", "w", v); API:Refresh("LAYOUT") end)
     page.controls.s5:SetPoint("TOPLEFT", utilityHeader, "BOTTOMLEFT", 0, -15)
@@ -36,7 +38,7 @@ local function CreateSizesTab(page, tabId)
     page.controls.s6:SetPoint("TOPLEFT", page.controls.s5, "BOTTOMLEFT", 0, -10)
 
     local buffHeader = UI.CreateHeader(page, L["Buff"])
-    buffHeader:SetPoint("TOPLEFT", page.controls.s6, "BOTTOMLEFT", 0, -15)
+    buffHeader:SetPoint("TOPLEFT", page.controls.s6, "BOTTOMLEFT", 0, -SECTION_GAP)
 
     page.controls.s7 = UI.CreateModernSlider(page, L["Width"], 20, 100, CDM.db.sizeBuff.w, function(v) SetSizeField("sizeBuff", "w", v); API:Refresh("LAYOUT") end)
     page.controls.s7:SetPoint("TOPLEFT", buffHeader, "BOTTOMLEFT", 0, -15)
