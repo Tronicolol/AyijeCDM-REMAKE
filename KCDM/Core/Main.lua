@@ -339,7 +339,6 @@ local function RunProfileAppliedHooks()
     CDM.OnDefensivesProfileApplied()
     CDM.OnTrinketsProfileApplied()
     CDM.OnResourcesProfileApplied()
-    CDM.OnExternalsProfileApplied()
 end
 
 CDM.RunProfileAppliedHooks = RunProfileAppliedHooks
@@ -349,7 +348,6 @@ local function InitializeModules()
     CDM.ReconcileDefensives()
     CDM.ReconcileTrinkets()
     CDM.ReconcileResources()
-    CDM.ReconcileExternals()
 
     CDM:InitializeCustomBuffs()
 
@@ -441,7 +439,6 @@ local function RegisterRefreshCallbacks()
         CDM.ReconcileDefensives()
         CDM.ReconcileRacials()
         CDM.ReconcileTrinkets()
-        CDM.ReconcileExternals()
     end, 50, { "TRACKERS" })
 
     CDM:RegisterRefreshCallback("resources", function()
