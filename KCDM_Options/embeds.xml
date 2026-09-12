@@ -10,6 +10,7 @@
     <Script file="Text.lua"/>
     <Script file="Glow.lua"/>
     <Script file="GroupEditorShared.lua"/>
+    <Script file="ResponsiveOptions.lua"/>
     <Script file="UnifiedBuffControlsOptions.lua"/>
     <Script file="AuraBorderRemoval.lua"/>
     <Script file="UnifiedBuffControlsOptionsFix.lua"/>
