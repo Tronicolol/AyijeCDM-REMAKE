@@ -11,7 +11,7 @@ if ns.cdmUnifiedTextSectionHeadersHooked then return end
 ns.cdmUnifiedTextSectionHeadersHooked = true
 
 local originalBuildTextOverrideWidgets = Shared.BuildTextOverrideWidgets
-local NESTED_INDENT = 20
+local NESTED_INDENT = 36
 local SECTION_TITLE_SPACE = 32
 local SECTION_TITLE_GAP = 26
 
