@@ -10,6 +10,16 @@ ns.cdmWideFrameVisualFixHooked = true
 
 local INNER_ATLAS = "Options_InnerFrame"
 local SIDEBAR_EXTRA_WIDTH = 25
+local TRACKED_SCROLL_FRAMES = {
+    "KCDM_GlowScrollFrame",
+    "KCDM_RacialsScrollFrame",
+    "KCDM_DefensivesScrollFrame",
+    "KCDM_TrinketsScrollFrame",
+    "KCDM_ResourcesScrollFrame",
+    "KCDM_BarsScrollFrame",
+    "KCDM_CastBarScrollFrame",
+    "KCDM_BuffGroupsLeftScroll",
+}
 
 local function FindInnerFrameTexture(root)
     if not root then return nil end
@@ -74,14 +84,63 @@ local function EnsureWideFrameVisuals()
     frame.cdmSidebarInnerAtlas = CreateCroppedSidebarAtlas(frame, sidebar)
 end
 
+local function CaptureScrollPositions()
+    local positions = {}
+
+    for _, frameName in ipairs(TRACKED_SCROLL_FRAMES) do
+        local scrollFrame = _G[frameName]
+        if scrollFrame and scrollFrame.GetVerticalScroll then
+            positions[frameName] = scrollFrame:GetVerticalScroll()
+        end
+    end
+
+    return positions
+end
+
+local function RestoreScrollPositions(positions)
+    if not positions then return end
+
+    for frameName, offset in pairs(positions) do
+        local scrollFrame = _G[frameName]
+        if scrollFrame and scrollFrame.SetVerticalScroll then
+            scrollFrame:SetVerticalScroll(offset)
+        end
+    end
+end
+
+local function PatchSidebarNavigation()
+    local sidebar = ns.ConfigSidebar
+    if not sidebar then return end
+
+    for _, child in ipairs({ sidebar:GetChildren() }) do
+        if child
+            and child.Text
+            and child.Texture
+            and child.GetScript
+            and not child.cdmScrollStatePatched then
+            local originalOnClick = child:GetScript("OnClick")
+            if type(originalOnClick) == "function" then
+                child.cdmScrollStatePatched = true
+                child:SetScript("OnClick", function(self, ...)
+                    local positions = CaptureScrollPositions()
+                    originalOnClick(self, ...)
+                    RestoreScrollPositions(positions)
+                end)
+            end
+        end
+    end
+end
+
 local originalShowConfig = API.ShowConfig
 API.ShowConfig = function(self, ...)
     originalShowConfig(self, ...)
     EnsureWideFrameVisuals()
+    PatchSidebarNavigation()
 end
 
 local originalRebuildConfigFrame = API.RebuildConfigFrame
 API.RebuildConfigFrame = function(self, ...)
     originalRebuildConfigFrame(self, ...)
     EnsureWideFrameVisuals()
+    PatchSidebarNavigation()
 end
