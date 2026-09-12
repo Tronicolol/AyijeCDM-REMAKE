@@ -14,6 +14,7 @@
     <Script file="GroupEditorShared.lua"/>
     <Script file="UnifiedBuffControlsOptions.lua"/>
     <Script file="AuraBorderRemoval.lua"/>
+    <Script file="UnifiedBuffControlsOptionsFix.lua"/>
     <Script file="BuffGroups.lua"/>
     <Script file="CooldownGroups.lua"/>
     <Script file="ProcSuppression.lua"/>
