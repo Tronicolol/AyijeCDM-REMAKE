@@ -154,8 +154,7 @@ local function BuildIncludeSpellIDs(frame)
         local ok, candidates = pcall(CDM.GetSpellIDCandidates, CDM, frame)
         if ok and type(candidates) == "table" then
             for index = 1, #candidates do
-                local candidate = candidates[index]
-                AddSpellID(include, queue, candidate)
+                AddSpellID(include, queue, candidates[index])
             end
         end
     end
@@ -411,7 +410,7 @@ end
 local function RefreshTargetContainers()
     for frame, state in pairs(states) do
         if state.activeUnit and frame:IsShown() and GetAuraOverlayEntry(frame) then
-            -- AuraContainer only receives UNIT_AURA for the unit token. Blizzard
+            -- AuraContainer receives UNIT_AURA for the unit token itself. Blizzard
             -- explicitly exposes UpdateAllAuras for external identity changes,
             -- such as PLAYER_TARGET_CHANGED.
             state.container:UpdateAllAuras()
@@ -427,14 +426,6 @@ targetWatcher:RegisterEvent("PLAYER_ENTERING_WORLD")
 targetWatcher:SetScript("OnEvent", function()
     RefreshTargetContainers()
 end)
-
--- Piggyback on KCDM's normal visual lifecycle only to keep pooled frames bound
--- to the correct spell/configuration. This hook never triggers a refresh itself.
-if type(CDM.RefreshFrameVisuals) == "function" then
-    hooksecurefunc(CDM, "RefreshFrameVisuals", function(_, frame)
-        BindFrame(frame)
-    end)
-end
 
 if CDM.RegisterRefreshCallback then
     CDM:RegisterRefreshCallback("targetAuraOverlay", BindAllActiveFrames, 93, { "CD_DATA" })
