@@ -203,31 +203,31 @@ local function IsNativeAuraActive(frame)
     return IsSafeID(auraSpellID)
 end
 
-local function ApplyOverlayAppearance(frame, state)
-    if not state then return end
+local function InitializeIconAppearance(icon)
+    if not icon then return end
 
-    if state.icon then
-        if CDM_C.ApplyIconTexCoord and CDM_C.GetEffectiveZoomAmount then
-            CDM_C.ApplyIconTexCoord(state.icon, CDM_C.GetEffectiveZoomAmount())
-        else
-            state.icon:SetTexCoord(0, 1, 0, 1)
-        end
-        state.icon:SetVertexColor(1, 1, 1, 1)
-        state.icon:SetDesaturated(false)
+    if CDM_C.ApplyIconTexCoord and CDM_C.GetEffectiveZoomAmount then
+        CDM_C.ApplyIconTexCoord(icon, CDM_C.GetEffectiveZoomAmount())
+    else
+        icon:SetTexCoord(0, 1, 0, 1)
     end
+    icon:SetVertexColor(1, 1, 1, 1)
+    icon:SetDesaturated(false)
+end
 
-    if state.cooldown then
-        local db = CDM.db or {}
-        local defaults = CDM.defaults or {}
-        local swipe = db.swipeColor or defaults.swipeColor
-        if swipe then
-            state.cooldown:SetSwipeColor(
-                swipe.r or 0,
-                swipe.g or 0,
-                swipe.b or 0,
-                swipe.a or 0.6
-            )
-        end
+local function InitializeCooldownAppearance(cooldown)
+    if not cooldown then return end
+
+    local db = CDM.db or {}
+    local defaults = CDM.defaults or {}
+    local swipe = db.swipeColor or defaults.swipeColor
+    if swipe then
+        cooldown:SetSwipeColor(
+            swipe.r or 0,
+            swipe.g or 0,
+            swipe.b or 0,
+            swipe.a or 0.6
+        )
     end
 end
 
@@ -262,8 +262,8 @@ local function CreateOverlayState(frame, includeSpellIDs, signature)
 
             local icon = auraButton:CreateTexture(nil, "ARTWORK")
             icon:SetAllPoints(auraButton)
+            InitializeIconAppearance(icon)
             auraButton:SetIcon(icon)
-            state.icon = icon
 
             local cooldown = CreateFrame("Cooldown", nil, auraButton, "CooldownFrameTemplate")
             cooldown:SetAllPoints(auraButton)
@@ -271,19 +271,18 @@ local function CreateOverlayState(frame, includeSpellIDs, signature)
             cooldown:SetDrawEdge(false)
             cooldown:SetDrawBling(false)
             cooldown:SetReverse(true)
+            InitializeCooldownAppearance(cooldown)
 
             if cooldown.SetCountdownFont and _G.KCDM_CDFont then
                 pcall(cooldown.SetCountdownFont, cooldown, "KCDM_CDFont")
             end
 
             auraButton:SetDurationCooldown(cooldown)
-            state.cooldown = cooldown
         end,
     })
 
     state.button = button
     states[frame] = state
-    ApplyOverlayAppearance(frame, state)
     return state
 end
 
@@ -321,7 +320,6 @@ local function EnableState(frame, state, includeSpellIDs, signature)
         return
     end
 
-    ApplyOverlayAppearance(frame, state)
     state.container:SetAlpha(1)
 
     if not state.activeUnit then
