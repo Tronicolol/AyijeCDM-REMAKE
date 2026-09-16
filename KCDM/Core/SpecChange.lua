@@ -7,6 +7,12 @@ function CDM:InitializeSpecChangeSystem()
 
     local ProcessSpecChange
 
+    local function BeginGlowSpecTransition()
+        if self.Glow and self.Glow.BeginSpecTransition then
+            self.Glow:BeginSpecTransition()
+        end
+    end
+
     local processingInProgress = false
     local specChangeVersion = 0
 
@@ -75,6 +81,9 @@ function CDM:InitializeSpecChangeSystem()
             if self.UpdateRacials then self:UpdateRacials() end
             if self.UpdateResources then self:UpdateResources() end
             if self.UpdatePlayerCastBar then self:UpdatePlayerCastBar() end
+            if self.Glow and self.Glow.EndSpecTransition then
+                self.Glow:EndSpecTransition()
+            end
         end)
     end
 
@@ -87,6 +96,7 @@ function CDM:InitializeSpecChangeSystem()
                 isFullSpecChange = true
                 self.pendingSpecChange = true
                 self:InvalidateSpecIDCache()
+                BeginGlowSpecTransition()
             end
             ScheduleBackstop()
         end
@@ -112,6 +122,7 @@ function CDM:InitializeSpecChangeSystem()
             isFullSpecChange = true
             self.pendingSpecChange = true
             self:InvalidateSpecIDCache()
+            BeginGlowSpecTransition()
         end
 
         ScheduleBackstop()
@@ -127,6 +138,7 @@ function CDM:InitializeSpecChangeSystem()
         isFullSpecChange = true
         self.pendingSpecChange = true
         self:InvalidateSpecIDCache()
+        BeginGlowSpecTransition()
         ScheduleBackstop()
     end
 

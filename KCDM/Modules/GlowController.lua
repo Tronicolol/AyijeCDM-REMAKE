@@ -20,6 +20,9 @@ local hookedFrames = setmetatable({}, { __mode = "k" })
 local colorArrays = setmetatable({}, { __mode = "k" })
 local originalRefreshActiveGlows = Glow.RefreshActiveGlows
 local lastVisualConfigVersion = Glow.visualConfigVersion or 0
+local specTransitionSuspended = false
+local specTransitionGeneration = 0
+local resetSnapshot = {}
 
 local procOpts = {
     color = nil,
@@ -348,6 +351,60 @@ local function ResetPrimary(frame)
     if host then HardStopHost(host) end
 end
 
+local function ResetAllPrimaryGlows()
+    local count = 0
+    for frame in pairs(states) do
+        count = count + 1
+        resetSnapshot[count] = frame
+    end
+
+    for i = 1, count do
+        local frame = resetSnapshot[i]
+        resetSnapshot[i] = nil
+        if frame then
+            ResetPrimary(frame)
+        end
+    end
+
+    if CDM.ForEachActiveFrame then
+        CDM:ForEachActiveFrame({ VIEWERS.ESSENTIAL, VIEWERS.UTILITY }, function(frame)
+            ClearCompat(frame)
+            local host = frame.cdmBuffGlowHost
+            if host then
+                HardStopHost(host)
+            end
+        end)
+    end
+end
+
+function Glow:BeginSpecTransition()
+    specTransitionGeneration = specTransitionGeneration + 1
+    specTransitionSuspended = true
+    ResetAllPrimaryGlows()
+end
+
+function Glow:EndSpecTransition()
+    if not specTransitionSuspended then return end
+
+    -- Blizzard recycles/reparents cooldown frames while specialization data is
+    -- rebuilding. Purge again before re-enabling requests so no transient host
+    -- geometry survives into the settled specialization.
+    ResetAllPrimaryGlows()
+
+    local generation = specTransitionGeneration
+    C_Timer.After(0, function()
+        if not specTransitionSuspended then return end
+        if specTransitionGeneration ~= generation then return end
+
+        specTransitionSuspended = false
+        if CDM.Refresh then
+            CDM:Refresh()
+        elseif CDM.GlowDirector and CDM.GlowDirector.RebuildIndex then
+            CDM.GlowDirector:RebuildIndex()
+        end
+    end)
+end
+
 local function ScheduleStop(frame, state)
     state.stopGeneration = state.stopGeneration + 1
     local generation = state.stopGeneration
@@ -438,6 +495,13 @@ end
 
 Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideColor, sourceID)
     if not frame or not VALID_PRODUCERS[producerToken] then return end
+    if specTransitionSuspended then
+        ClearCompat(frame)
+        local host = frame.cdmBuffGlowHost
+        if host then HardStopHost(host) end
+        states[frame] = nil
+        return
+    end
     local state = GetState(frame, false)
     if state and state.boundCooldownID ~= nil and frame.cooldownID ~= nil and state.boundCooldownID ~= frame.cooldownID then
         ResetPrimary(frame)
@@ -466,9 +530,20 @@ end
 Glow.InstallAcquireResetHook = function(self, viewer)
     hooksecurefunc(viewer, "OnAcquireItemFrame", function(_, itemFrame)
         local state = states[itemFrame]
+        if specTransitionSuspended then
+            if state then
+                ResetPrimary(itemFrame)
+            else
+                ClearCompat(itemFrame)
+                local host = itemFrame.cdmBuffGlowHost
+                if host then HardStopHost(host) end
+            end
+            return
+        end
         if not state then
+            ClearCompat(itemFrame)
             local host = itemFrame.cdmBuffGlowHost
-            if host and host.cdmGlowActive then HardStopHost(host) end
+            if host then HardStopHost(host) end
             return
         end
         state.acquireGeneration = state.acquireGeneration + 1
@@ -486,6 +561,7 @@ Glow.InstallAcquireResetHook = function(self, viewer)
 end
 
 Glow.RefreshActiveGlows = function(self, forceUpdate)
+    if specTransitionSuspended then return end
     local version = self.visualConfigVersion or 0
     local configChanged = version ~= lastVisualConfigVersion
     lastVisualConfigVersion = version
@@ -498,6 +574,7 @@ Glow.RefreshActiveGlows = function(self, forceUpdate)
 end
 
 Glow.RefreshSpellGlowTypeOverrides = function(self)
+    if specTransitionSuspended then return end
     for frame in pairs(states) do RefreshFrame(frame, false) end
 end
 
