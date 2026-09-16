@@ -1,0 +1,84 @@
+name: Retry generic glow stability
+
+on:
+  push:
+    branches:
+      - arreglos-visuales
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arreglos-visuales
+          fetch-depth: 0
+
+      - name: Reuse generic glow patch
+        shell: python
+        run: |
+          from pathlib import Path
+          src = Path('.github/workflows/glow-generic-stability.yml').read_text(encoding='utf-8')
+          start = src.index('      - name: Apply generic CDM mutation glow fix')
+          start = src.index('        run: |', start) + len('        run: |\n')
+          end = src.index('      - name: Install Lua 5.1', start)
+          block = src[start:end]
+          lines = []
+          for line in block.splitlines():
+              if line.startswith('          '):
+                  line = line[10:]
+              lines.append(line)
+          code = '\n'.join(lines) + '\n'
+          compile(code, '<generic-glow-patch>', 'exec')
+          exec(code, {'__name__': '__main__'})
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate addon
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check
+
+      - name: Validate glow invariants
+        shell: python
+        run: |
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+          c = Path('KCDM/Modules/GlowController.lua').read_text(encoding='utf-8')
+          assert 'local LAYOUT_SETTLE_DELAY = 0.12' in c
+          assert 'local function BeginLayoutMutation()' in c
+          assert 'local function FinishLayoutMutation(generation)' in c
+          assert 'CDM:ForceReanchorAll()' in c
+          assert 'LCG.ButtonGlow_Stop(host)' in c
+          assert 'ButtonGlowPool' not in c
+          assert 'pool:Release(f)' not in c
+
+      - name: Commit bugfix
+        run: |
+          git config user.name 'Tronicolol'
+          git config user.email '54152736+Tronicolol@users.noreply.github.com'
+          git add KCDM/Modules/GlowController.lua
+          git commit -m 'Stabilize glows across CooldownViewer rebuilds [skip ci]'
+          git push origin HEAD:arreglos-visuales
+
+      - name: Build complete addon package
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+          cp -a KCDM_Options package/KCDM_Options
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ayije-Complete-Generic-Glow-Fix
+          path: package/
+          if-no-files-found: error
