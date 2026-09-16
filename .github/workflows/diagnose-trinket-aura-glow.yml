@@ -25,7 +25,7 @@ jobs:
       - name: Validate diagnostic addon
         run: |
           find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
-          git diff --check main...HEAD
+          git diff --check origin/main...HEAD
           python - <<'PY'
           from pathlib import Path
           import subprocess
@@ -35,7 +35,7 @@ jobs:
               for xml in root.rglob('*.xml'):
                   ET.parse(xml)
 
-          changed = set(subprocess.check_output(['git', 'diff', '--name-only', 'main...HEAD'], text=True).splitlines())
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only', 'origin/main...HEAD'], text=True).splitlines())
           expected = {
               '.github/workflows/diagnose-trinket-aura-glow.yml',
               'KCDM/Core/TrinketAuraDebug.lua',
