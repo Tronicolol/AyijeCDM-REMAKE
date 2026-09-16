@@ -286,6 +286,34 @@ local function MatchCooldownInfo(info, spellToTarget, opts)
     return match
 end
 
+function CDM:ResolveAuraOverlayEntryForFrame(frame)
+    if not frame then return nil end
+
+    local cooldownID = frame.cooldownID
+    local auraMap = self._auraOverlayEnabled
+    if not cooldownID or not auraMap then return nil end
+
+    local cached = auraMap[cooldownID]
+    if cached then return cached end
+
+    local spellMap = self._auraOverlaySpellMap
+    local opts = self.AURA_OVERLAY_MATCH_OPTS
+    if not spellMap or not opts then return nil end
+
+    local info = GetFrameCooldownInfo(frame)
+    if not info then return nil end
+
+    local entry = MatchCooldownInfo(info, spellMap, opts)
+    if not entry then return nil end
+
+    auraMap[cooldownID] = entry
+    if entry.readyGlowEnabled and self._readyGlowCooldownIDs then
+        self._readyGlowCooldownIDs[cooldownID] = true
+    end
+
+    return entry
+end
+
 function CDM:GetPreferredBuffGroupSpellID(frame)
     if not frame then return nil end
     local candidates = self:GetSpellIDCandidates(frame)
@@ -613,6 +641,7 @@ function CDM:RefreshSpecData()
     if self._auraOverlayEnabled then table_wipe(self._auraOverlayEnabled) end
     if self._readyGlowCooldownIDs then table_wipe(self._readyGlowCooldownIDs) end
     local auraSpellToEntry = self._BuildAuraOverlaySpellMap and self:_BuildAuraOverlaySpellMap(specID) or {}
+    self._auraOverlaySpellMap = auraSpellToEntry
 
     local groupOpts = GROUP_MATCH_OPTS
     local auraOpts = self.AURA_OVERLAY_MATCH_OPTS
@@ -677,6 +706,16 @@ function CDM:RefreshSpecData()
                 end
             end
         end
+    end
+
+
+    -- Equipped-item frames can exist at runtime without appearing in any
+    -- CooldownViewer category set. Resolve those live frames before the
+    -- glow index is rebuilt.
+    if auraMap and self.ForEachActiveFrame and self.CONST and self.CONST.COOLDOWN_VIEWER_NAMES then
+        self:ForEachActiveFrame(self.CONST.COOLDOWN_VIEWER_NAMES, function(frame)
+            self:ResolveAuraOverlayEntryForFrame(frame)
+        end)
     end
 
     if previousCdMatches and cdSets then

@@ -23,5 +23,4 @@
     <Script file="BlizzardProcSuppression.lua"/>
     <Script file="GlowController.lua"/>
     <Script file="PlayerCastBar.lua"/>
-    <Script file="TrinketAuraMapDebug.lua"/>
 </Ui>

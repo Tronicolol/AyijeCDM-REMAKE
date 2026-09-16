@@ -218,6 +218,9 @@ function GlowDirector:OnCooldownIDSet(frame)
 
     local cdID = frame.cooldownID
     if not cdID then return end
+    if CDM.ResolveAuraOverlayEntryForFrame then
+        CDM:ResolveAuraOverlayEntryForFrame(frame)
+    end
     local readySet = CDM._readyGlowCooldownIDs
     if not readySet or not readySet[cdID] then return end
 

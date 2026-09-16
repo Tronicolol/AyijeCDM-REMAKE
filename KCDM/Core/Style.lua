@@ -452,7 +452,11 @@ local function FindAuraOverlayEntry(frame)
     local map = CDM._auraOverlayEnabled
     if not map then return nil end
     local cdID = frame and frame.cooldownID
-    if cdID and map[cdID] then return map[cdID] end
+    if not cdID then return nil end
+    if map[cdID] then return map[cdID] end
+    if CDM.ResolveAuraOverlayEntryForFrame then
+        return CDM:ResolveAuraOverlayEntryForFrame(frame)
+    end
     return nil
 end
 
