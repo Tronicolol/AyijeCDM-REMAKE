@@ -17,6 +17,7 @@ local GLOW_KEY = "CDM_SpellAlert"
 local PROC_GLOW_FIELD = "_ProcGlow" .. GLOW_KEY
 local activeGlowFrames = setmetatable({}, { __mode = "k" })
 local pendingHideFrames = setmetatable({}, { __mode = "k" })
+local pendingVisualHideFrames = setmetatable({}, { __mode = "k" })
 local buffHookedFrames = setmetatable({}, { __mode = "k" })
 local HideCustomGlow
 
@@ -40,6 +41,27 @@ local function DrainPendingHide()
 end
 
 debounceDrainer:SetScript("OnUpdate", DrainPendingHide)
+
+local visualHideDrainer = CreateFrame("Frame")
+visualHideDrainer:Hide()
+
+local function DrainPendingVisualHide()
+    visualHideDrainer:Hide()
+    for frame in pairs(pendingVisualHideFrames) do
+        pendingVisualHideFrames[frame] = nil
+        if not frame.cdmGlowProducer then
+            local host = frame.cdmBuffGlowHost
+            if host then
+                HideCustomGlow(host)
+                host:Hide()
+            else
+                HideCustomGlow(frame)
+            end
+        end
+    end
+end
+
+visualHideDrainer:SetScript("OnUpdate", DrainPendingVisualHide)
 
 local function IsSupportedViewerName(name)
     return name == VIEWERS.ESSENTIAL or name == VIEWERS.UTILITY
@@ -508,6 +530,7 @@ end
 
 function Glow:StopGlow(frame)
     if frame then
+        pendingVisualHideFrames[frame] = nil
         self:HidePandemicGlow(frame)
         frame.cdmGlowProducer = nil
         frame.cdmBuffGlowWanted = nil
@@ -528,6 +551,8 @@ function Glow:RequestBuffGlow(frame, producerToken, enabled, overrideColor, sour
     if not frame or not LCG then return end
 
     if enabled then
+        pendingVisualHideFrames[frame] = nil
+
         local current = frame.cdmGlowProducer
         local currentPri = current and PRODUCER_PRIORITY[current]
         local requestPri = PRODUCER_PRIORITY[producerToken]
@@ -556,13 +581,8 @@ function Glow:RequestBuffGlow(frame, producerToken, enabled, overrideColor, sour
         frame.cdmBuffGlowOverrideColor = nil
         frame.cdmBuffGlowSourceID = nil
 
-        local host = frame.cdmBuffGlowHost
-        if host then
-            HideCustomGlow(host)
-            host:Hide()
-        else
-            HideCustomGlow(frame)
-        end
+        pendingVisualHideFrames[frame] = true
+        visualHideDrainer:Show()
     end
 end
 
@@ -574,6 +594,7 @@ function Glow:RefreshActiveGlows()
     if not LCG then return end
 
     DrainPendingHide()
+    DrainPendingVisualHide()
 
     local count = 0
     for frame in pairs(activeGlowFrames) do
@@ -620,6 +641,16 @@ function Glow:HookAlertManager()
         pendingHideFrames[frame] = nil
 
         HideBlizzardGlow(frame)
+        if Glow.ShouldSuppressAlert and Glow:ShouldSuppressAlert(frame) then
+            Glow:RequestBuffGlow(frame, "alert", false, nil, nil)
+            if CDM.RefreshFrameVisuals then
+                C_Timer.After(0, function()
+                    if frame then CDM:RefreshFrameVisuals(frame) end
+                end)
+            end
+            return
+        end
+
         Glow:RequestBuffGlow(frame, "alert", true, nil, nil)
     end)
 
@@ -640,6 +671,32 @@ end
 local function GlowCfg(db, defaults, key)
     if db[key] ~= nil then return db[key] end
     return defaults[key]
+end
+
+local function SignatureValue(value)
+    if value == nil then return "<nil>" end
+    if value == true then return "1" end
+    if value == false then return "0" end
+    return tostring(value)
+end
+
+local function BuildGlowVisualSignature()
+    local color = glowCache.color or {}
+    return table.concat({
+        SignatureValue(glowCache.type),
+        SignatureValue(glowCache.useCustomColor),
+        SignatureValue(color.r), SignatureValue(color.g), SignatureValue(color.b), SignatureValue(color.a),
+        SignatureValue(glowCache.pixelLines), SignatureValue(glowCache.pixelFrequency),
+        SignatureValue(glowCache.pixelLength), SignatureValue(glowCache.pixelThickness),
+        SignatureValue(glowCache.pixelXOffset), SignatureValue(glowCache.pixelYOffset),
+        SignatureValue(glowCache.pixelBorder),
+        SignatureValue(glowCache.autocastParticles), SignatureValue(glowCache.autocastFrequency),
+        SignatureValue(glowCache.autocastScale), SignatureValue(glowCache.autocastXOffset),
+        SignatureValue(glowCache.autocastYOffset),
+        SignatureValue(glowCache.buttonFrequency),
+        SignatureValue(glowCache.procDuration), SignatureValue(glowCache.procXOffset),
+        SignatureValue(glowCache.procYOffset)
+    }, "|")
 end
 
 function Glow:RefreshCache()
@@ -674,7 +731,12 @@ function Glow:RefreshCache()
         glowCache.type = "proc"
     end
 
-    self:RefreshActiveGlows()
+    local signature = BuildGlowVisualSignature()
+    if self.visualConfigSignature ~= signature then
+        self.visualConfigSignature = signature
+        self.visualConfigVersion = (self.visualConfigVersion or 0) + 1
+        self:RefreshActiveGlows()
+    end
 end
 
 function Glow:Initialize()

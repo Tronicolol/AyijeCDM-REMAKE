@@ -9,7 +9,6 @@ if not VIEWERS or not LCG then return end
 
 local originalRequestBuffGlow = Glow.RequestBuffGlow
 local originalStopGlow = Glow.StopGlow
-local originalInstallAcquireResetHook = Glow.InstallAcquireResetHook
 if type(originalRequestBuffGlow) ~= "function" or type(originalStopGlow) ~= "function" then return end
 
 local GLOW_KEY = "CDM_SpellAlert"
@@ -31,6 +30,7 @@ local VALID_GLOW_TYPES = {
 
 local customStates = setmetatable({}, { __mode = "k" })
 local pendingDisableGeneration = setmetatable({}, { __mode = "k" })
+local lastVisualConfigVersion = Glow.visualConfigVersion or 0
 
 local function IsManagedCooldownFrame(frame)
     if not frame then return false end
@@ -540,19 +540,6 @@ Glow.StopGlow = function(self, frame)
     originalStopGlow(self, frame)
 end
 
-if type(originalInstallAcquireResetHook) == "function" then
-    Glow.InstallAcquireResetHook = function(self, viewer)
-        originalInstallAcquireResetHook(self, viewer)
-
-        hooksecurefunc(viewer, "OnAcquireItemFrame", function(_, itemFrame)
-            local state = customStates[itemFrame]
-            if state then
-                StopCustomState(itemFrame, state)
-            end
-        end)
-    end
-end
-
 function Glow:RefreshSpellGlowTypeOverrides(forceUpdate)
     if not CDM.ForEachActiveFrame then return end
 
@@ -578,5 +565,8 @@ function Glow:RefreshSpellGlowTypeOverrides(forceUpdate)
 end
 
 CDM:RegisterRefreshCallback("perSpellGlowType", function()
-    Glow:RefreshSpellGlowTypeOverrides(true)
+    local visualConfigVersion = Glow.visualConfigVersion or 0
+    local forceUpdate = visualConfigVersion ~= lastVisualConfigVersion
+    lastVisualConfigVersion = visualConfigVersion
+    Glow:RefreshSpellGlowTypeOverrides(forceUpdate)
 end, 55, { "STYLE" })

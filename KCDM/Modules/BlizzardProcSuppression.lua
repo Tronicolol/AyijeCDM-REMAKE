@@ -6,9 +6,6 @@ local Glow = CDM.Glow
 local VIEWERS = CDM.CONST and CDM.CONST.VIEWERS
 if not VIEWERS then return end
 
-local originalHookAlertManager = Glow.HookAlertManager
-if type(originalHookAlertManager) ~= "function" then return end
-
 local function IsManagedCooldownFrame(frame)
     if not frame then return false end
 
@@ -97,6 +94,23 @@ local function ShouldHideBlizzardProcGlow(frame)
     return false
 end
 
+function Glow:ShouldSuppressAlert(frame)
+    return IsManagedCooldownFrame(frame) and ShouldHideBlizzardProcGlow(frame)
+end
+
+local refreshPending = setmetatable({}, { __mode = "k" })
+
+local function QueueFrameRefresh(frame)
+    if not frame or refreshPending[frame] then return end
+    refreshPending[frame] = true
+    C_Timer.After(0, function()
+        refreshPending[frame] = nil
+        if frame and CDM.RefreshFrameVisuals then
+            CDM:RefreshFrameVisuals(frame)
+        end
+    end)
+end
+
 function Glow:RefreshBlizzardProcSuppression()
     if not CDM.ForEachActiveFrame then return end
 
@@ -104,25 +118,7 @@ function Glow:RefreshBlizzardProcSuppression()
         if ShouldHideBlizzardProcGlow(frame) then
             self:HideBlizzardGlow(frame)
             self:RequestBuffGlow(frame, "alert", false)
+            QueueFrameRefresh(frame)
         end
     end)
-end
-
-Glow.HookAlertManager = function(self)
-    originalHookAlertManager(self)
-
-    if self.blizzardProcSuppressionHooked then return end
-
-    local alertManager = _G.ActionButtonSpellAlertManager
-    if not alertManager then return end
-
-    hooksecurefunc(alertManager, "ShowAlert", function(_, frame)
-        if not IsManagedCooldownFrame(frame) then return end
-        if not ShouldHideBlizzardProcGlow(frame) then return end
-
-        self:HideBlizzardGlow(frame)
-        self:RequestBuffGlow(frame, "alert", false)
-    end)
-
-    self.blizzardProcSuppressionHooked = true
 end

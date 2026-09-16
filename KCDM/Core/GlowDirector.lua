@@ -242,26 +242,56 @@ function GlowDirector:OnCooldownIDCleared(frame)
     frame.cdmGlowDirectorCdID = nil
 end
 
+local acquireResyncPending = setmetatable({}, { __mode = "k" })
+
+local function QueueAcquireResync(frame)
+    if not frame or acquireResyncPending[frame] then return end
+    acquireResyncPending[frame] = true
+
+    C_Timer_After(0, function()
+        acquireResyncPending[frame] = nil
+        if not frame then return end
+
+        local cdID = frame.cooldownID
+        if not cdID then
+            GlowDirector:OnCooldownIDCleared(frame)
+            return
+        end
+
+        if frame.cdmGlowDirectorCdID == cdID then
+            RequestFanout(cdID)
+        else
+            GlowDirector:OnCooldownIDSet(frame)
+        end
+    end)
+end
+
 function GlowDirector:InstallAcquireResetHook(v)
     hooksecurefunc(v, "OnAcquireItemFrame", function(_, itemFrame)
         -- Keep the previous registration until SetCooldownID/ClearCooldownID can remove it.
         -- Clearing it here leaves recycled frames registered under an old cooldownID.
-        if itemFrame.cdmGlowLifecycleHooked then return end
-        itemFrame.cdmGlowLifecycleHooked = true
+        if not itemFrame.cdmGlowLifecycleHooked then
+            itemFrame.cdmGlowLifecycleHooked = true
 
-        hooksecurefunc(itemFrame, "SetCooldownID", function(self)
-            if self.cooldownID == self.cdmGlowDirectorCdID then return end
-            GlowDirector:OnCooldownIDSet(self)
-        end)
+            hooksecurefunc(itemFrame, "SetCooldownID", function(self)
+                if self.cooldownID == self.cdmGlowDirectorCdID then return end
+                GlowDirector:OnCooldownIDSet(self)
+            end)
 
-        hooksecurefunc(itemFrame, "ClearCooldownID", function(self)
-            GlowDirector:OnCooldownIDCleared(self)
-        end)
+            hooksecurefunc(itemFrame, "ClearCooldownID", function(self)
+                GlowDirector:OnCooldownIDCleared(self)
+            end)
 
-        hooksecurefunc(itemFrame, "SetOverrideSpell", function(self)
-            if not self.cdmGlowDirectorCdID then return end
-            GlowDirector:OnCooldownIDSet(self)
-        end)
+            hooksecurefunc(itemFrame, "SetOverrideSpell", function(self)
+                if not self.cdmGlowDirectorCdID then return end
+                GlowDirector:OnCooldownIDSet(self)
+            end)
+        end
+
+        -- Blizzard can reacquire the same frame with the same cooldownID when
+        -- settings/layout state changes. The visual glow reset still ran, so
+        -- always reconcile once the acquire cycle has finished.
+        QueueAcquireResync(itemFrame)
     end)
 end
 
