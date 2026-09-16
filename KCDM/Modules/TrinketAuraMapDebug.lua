@@ -2,7 +2,7 @@ local AddonName = "KCDM"
 local CDM = _G[AddonName]
 if not CDM then return end
 
--- Diagnostic only. Does not modify aura, cooldown, glow or icon state.
+-- Diagnostic only. Does not change saved settings.
 -- Usage: /kcdmauramapdiag while Show Aura Overlay + Aura Glow are enabled.
 
 local function Accessible(value)
@@ -122,7 +122,54 @@ local function PrintOverrideMap(prefix, overrideMap, ids)
     print("|cffd8c67a[KCDM-MAP]|r " .. prefix .. " configured=" .. (#parts > 0 and table.concat(parts, ",") or "NONE"))
 end
 
-local function PrintFrame(frame, viewerName, specID)
+local function GetCategories()
+    if type(CDM.ALL_VIEWER_CATEGORIES) == "table" then
+        return CDM.ALL_VIEWER_CATEGORIES
+    end
+
+    local categories = {}
+    local evc = Enum and Enum.CooldownViewerCategory
+    if evc then
+        if evc.Essential ~= nil then categories[#categories + 1] = evc.Essential end
+        if evc.Utility ~= nil then categories[#categories + 1] = evc.Utility end
+        if evc.TrackedBuff ~= nil then categories[#categories + 1] = evc.TrackedBuff end
+        if evc.TrackedBar ~= nil then categories[#categories + 1] = evc.TrackedBar end
+    end
+    return categories
+end
+
+local function PrintCategoryMembership(cooldownID, info)
+    print("|cffd8c67a[KCDM-MAP]|r infoCategory=" .. F(info and info.category))
+
+    if not C_CooldownViewer or type(C_CooldownViewer.GetCooldownViewerCategorySet) ~= "function" then
+        print("|cffd8c67a[KCDM-MAP]|r categorySets=UNAVAILABLE")
+        return
+    end
+
+    local any = false
+    for _, category in ipairs(GetCategories()) do
+        local ids = SafeCall(C_CooldownViewer.GetCooldownViewerCategorySet, category, true)
+        local contains = false
+        local count = type(ids) == "table" and #ids or 0
+        if type(ids) == "table" then
+            for _, id in ipairs(ids) do
+                if id == cooldownID then
+                    contains = true
+                    any = true
+                    break
+                end
+            end
+        end
+        print(string.format(
+            "|cffd8c67a[KCDM-MAP]|r category[%s] contains=%s count=%d",
+            F(category), F(contains), count
+        ))
+    end
+
+    print("|cffd8c67a[KCDM-MAP]|r categoryAny=" .. F(any))
+end
+
+local function PrintFrame(frame, viewerName, specID, compact)
     local equipSlot = SafeFrameMethod(frame, "GetEquipSlot")
     if not Accessible(equipSlot) or type(equipSlot) ~= "number" or equipSlot <= 0 then return end
 
@@ -144,6 +191,9 @@ local function PrintFrame(frame, viewerName, specID)
 
     local runtimeEntry = type(CDM._auraOverlayEnabled) == "table" and CDM._auraOverlayEnabled[cooldownID] or nil
     print("|cffd8c67a[KCDM-MAP]|r runtimeEntry " .. EntryFlags(runtimeEntry))
+    PrintCategoryMembership(cooldownID, info)
+
+    if compact then return end
 
     local builtMap = type(CDM._BuildAuraOverlaySpellMap) == "function" and CDM:_BuildAuraOverlaySpellMap(specID) or nil
     local builtFound = false
@@ -183,30 +233,53 @@ local function PrintFrame(frame, viewerName, specID)
     end
 end
 
-SLASH_KCDMAURAMAPDIAG1 = "/kcdmauramapdiag"
-SlashCmdList.KCDMAURAMAPDIAG = function()
-    local specIndex = GetSpecialization()
-    local specID = specIndex and GetSpecializationInfo(specIndex) or nil
-    print("|cffd8c67a[KCDM-MAP]|r START spec=" .. F(specID))
-
+local function ForEachEquippedFrame(fn)
     local viewers = (CDM.CONST and CDM.CONST.COOLDOWN_VIEWER_NAMES) or {
         "EssentialCooldownViewer",
         "UtilityCooldownViewer",
     }
 
+    if type(CDM.ForEachActiveFrame) ~= "function" then return false end
+
     local found = false
-    if type(CDM.ForEachActiveFrame) == "function" then
-        CDM:ForEachActiveFrame(viewers, function(frame, viewerName)
-            local equipSlot = SafeFrameMethod(frame, "GetEquipSlot")
-            if Accessible(equipSlot) and type(equipSlot) == "number" and equipSlot > 0 then
-                found = true
-                PrintFrame(frame, viewerName, specID)
-            end
-        end)
-    end
+    CDM:ForEachActiveFrame(viewers, function(frame, viewerName)
+        local equipSlot = SafeFrameMethod(frame, "GetEquipSlot")
+        if Accessible(equipSlot) and type(equipSlot) == "number" and equipSlot > 0 then
+            found = true
+            fn(frame, viewerName)
+        end
+    end)
+    return found
+end
+
+SLASH_KCDMAURAMAPDIAG1 = "/kcdmauramapdiag"
+SlashCmdList.KCDMAURAMAPDIAG = function()
+    local specIndex = GetSpecialization()
+    local specID = specIndex and GetSpecializationInfo(specIndex) or nil
+    local dataReady = type(CDM.IsCooldownViewerDataReady) == "function" and CDM:IsCooldownViewerDataReady() or nil
+    print("|cffd8c67a[KCDM-MAP]|r START spec=" .. F(specID) .. " dataReady=" .. F(dataReady))
+
+    local found = ForEachEquippedFrame(function(frame, viewerName)
+        PrintFrame(frame, viewerName, specID, false)
+    end)
 
     if not found then
         print("|cffd8c67a[KCDM-MAP]|r NO_EQUIPPED_ITEM_FRAMES")
+        print("|cffd8c67a[KCDM-MAP]|r END")
+        return
     end
+
+    print("|cffd8c67a[KCDM-MAP]|r FORCE_REFRESH")
+    if type(CDM.MarkSpecDataDirty) == "function" then
+        CDM:MarkSpecDataDirty()
+    end
+    if type(CDM.RefreshSpecData) == "function" then
+        CDM:RefreshSpecData()
+    end
+
+    ForEachEquippedFrame(function(frame, viewerName)
+        PrintFrame(frame, viewerName, specID, true)
+    end)
+
     print("|cffd8c67a[KCDM-MAP]|r END")
 end
