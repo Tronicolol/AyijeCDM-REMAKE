@@ -254,93 +254,48 @@ local function RefreshStyleCache()
     styleCache.buffBarShowApplications = CfgValue(db, defaults, "buffBarShowApplications", true)
     styleCache.buffBarApplicationsFontSize = CfgValue(db, defaults, "buffBarApplicationsFontSize", 15)
     styleCache.buffBarApplicationsColor = CfgValue(db, defaults, "buffBarApplicationsColor", { r = 1, g = 1, b = 1, a = 1 })
-    styleCache.buffBarApplicationsPosition = CfgValue(db, defaults, "buffBarApplicationsPosition", "RIGHT")
-    styleCache.buffBarApplicationsOffsetX = CfgValue(db, defaults, "buffBarApplicationsOffsetX", -4)
+    styleCache.buffBarApplicationsPosition = CfgValue(db, defaults, "buffBarApplicationsPosition", "CENTER")
+    styleCache.buffBarApplicationsOffsetX = CfgValue(db, defaults, "buffBarApplicationsOffsetX", 0)
     styleCache.buffBarApplicationsOffsetY = CfgValue(db, defaults, "buffBarApplicationsOffsetY", 0)
-    styleCache.buffBarShowIcon = CfgValue(db, defaults, "buffBarShowIcon", true)
-    styleCache.buffBarIconWidth = CfgValue(db, defaults, "buffBarIconWidth", 0)
-    styleCache.buffBarIconHeight = CfgValue(db, defaults, "buffBarIconHeight", 0)
-    styleCache.buffBarIconZoom = CfgValue(db, defaults, "buffBarIconZoom", true)
-    styleCache.buffBarIconZoomAmount = CfgValue(db, defaults, "buffBarIconZoomAmount", 0.08)
-    styleCache.buffBarBorderEnabled = CfgValue(db, defaults, "buffBarBorderEnabled", true)
-    styleCache.buffBarBorderColor = CfgValue(db, defaults, "buffBarBorderColor", CDM_C.WHITE)
-    styleCache.buffBarBackgroundTexture = CfgValue(db, defaults, "buffBarBackgroundTexture", "Blizzard")
-    styleCache.buffBarBackgroundInset = CfgValue(db, defaults, "buffBarBackgroundInset", 0)
-    styleCache.buffBarUseClassColor = CfgValue(db, defaults, "buffBarUseClassColor", false)
-    styleCache.buffBarUseCustomName = CfgValue(db, defaults, "buffBarUseCustomName", false)
-    styleCache.buffBarCustomName = CfgValue(db, defaults, "buffBarCustomName", "")
-    styleCache.buffBarHideDebuffBorder = CfgValue(db, defaults, "buffBarHideDebuffBorder", false)
-    styleCache.buffBarShowPandemic = CfgValue(db, defaults, "buffBarShowPandemic", true)
-    styleCache.buffBarShowPandemicGlow = CfgValue(db, defaults, "buffBarShowPandemicGlow", false)
-    styleCache.buffBarPandemicGlowType = CfgValue(db, defaults, "buffBarPandemicGlowType", "button")
-    styleCache.buffBarPandemicGlowColor = CfgValue(db, defaults, "buffBarPandemicGlowColor", CDM_C.WHITE)
-    styleCache.buffBarPandemicBorderEnabled = CfgValue(db, defaults, "buffBarPandemicBorderEnabled", false)
-    styleCache.buffBarPandemicBorderColor = CfgValue(db, defaults, "buffBarPandemicBorderColor", CDM_C.WHITE)
-    styleCache.buffBarPandemicBorderColorBuffBars = CfgValue(db, defaults, "buffBarPandemicBorderColorBuffBars", false)
-    styleCache.buffBarCooldownReverse = CfgValue(db, defaults, "buffBarCooldownReverse", true)
-    styleCache.buffBarCooldownShowEdge = CfgValue(db, defaults, "buffBarCooldownShowEdge", false)
-    styleCache.buffBarCooldownShowSwipe = CfgValue(db, defaults, "buffBarCooldownShowSwipe", true)
-    styleCache.buffBarCooldownSwipeColor = CfgValue(db, defaults, "buffBarCooldownSwipeColor", CDM_C.SWIPE_COLOR)
-    styleCache.buffBarCooldownSwipeAlpha = CfgValue(db, defaults, "buffBarCooldownSwipeAlpha", 1)
-    styleCache.buffBarCooldownHideNumbers = CfgValue(db, defaults, "buffBarCooldownHideNumbers", false)
-    styleCache.buffBarCooldownDesaturate = CfgValue(db, defaults, "buffBarCooldownDesaturate", false)
-    styleCache.buffBarCooldownIconColor = CfgValue(db, defaults, "buffBarCooldownIconColor", CDM_C.WHITE)
-    styleCache.buffBarCooldownIconAlpha = CfgValue(db, defaults, "buffBarCooldownIconAlpha", 1)
-    styleCache.buffBarTimeFormat = CfgValue(db, defaults, "buffBarTimeFormat", "AUTO")
-    styleCache.buffBarTimeDecimals = CfgValue(db, defaults, "buffBarTimeDecimals", 1)
-    styleCache.buffBarTimeThreshold = CfgValue(db, defaults, "buffBarTimeThreshold", 5)
-    styleCache.buffBarNamePosition = CfgValue(db, defaults, "buffBarNamePosition", "LEFT")
-    styleCache.buffBarNameJustifyH = CfgValue(db, defaults, "buffBarNameJustifyH", "LEFT")
-    styleCache.buffBarDurationJustifyH = CfgValue(db, defaults, "buffBarDurationJustifyH", "RIGHT")
-    styleCache.buffBarApplicationsJustifyH = CfgValue(db, defaults, "buffBarApplicationsJustifyH", "CENTER")
-    styleCache.buffBarTextureOrientation = CfgValue(db, defaults, "buffBarTextureOrientation", "HORIZONTAL")
-    styleCache.buffBarBackgroundTextureOrientation = CfgValue(db, defaults, "buffBarBackgroundTextureOrientation", "HORIZONTAL")
-    styleCache.buffBarSmooth = CfgValue(db, defaults, "buffBarSmooth", false)
-    styleCache.buffBarSparkEnabled = CfgValue(db, defaults, "buffBarSparkEnabled", false)
-    styleCache.buffBarSparkTexture = CfgValue(db, defaults, "buffBarSparkTexture", "Interface\\CastingBar\\UI-CastingBar-Spark")
-    styleCache.buffBarSparkWidth = CfgValue(db, defaults, "buffBarSparkWidth", 10)
-    styleCache.buffBarSparkHeight = CfgValue(db, defaults, "buffBarSparkHeight", 0)
-    styleCache.buffBarSparkBlendMode = CfgValue(db, defaults, "buffBarSparkBlendMode", "ADD")
-    styleCache.buffBarSparkColor = CfgValue(db, defaults, "buffBarSparkColor", CDM_C.WHITE)
-    styleCache.buffBarSparkAlpha = CfgValue(db, defaults, "buffBarSparkAlpha", 1)
-    styleCache.buffBarSparkOffsetX = CfgValue(db, defaults, "buffBarSparkOffsetX", 0)
-    styleCache.buffBarSparkOffsetY = CfgValue(db, defaults, "buffBarSparkOffsetY", 0)
-    styleCache.buffBarTextureColor = CfgValue(db, defaults, "buffBarTextureColor", CDM_C.WHITE)
-    styleCache.buffBarTextureAlpha = CfgValue(db, defaults, "buffBarTextureAlpha", 1)
-    styleCache.buffBarBackgroundTextureColor = CfgValue(db, defaults, "buffBarBackgroundTextureColor", CDM_C.WHITE)
-    styleCache.buffBarBackgroundTextureAlpha = CfgValue(db, defaults, "buffBarBackgroundTextureAlpha", 1)
-    styleCache.buffBarIconMask = CfgValue(db, defaults, "buffBarIconMask", false)
-    styleCache.buffBarIconMaskShape = CfgValue(db, defaults, "buffBarIconMaskShape", "SQUARE")
-    styleCache.buffBarIconBorderEnabled = CfgValue(db, defaults, "buffBarIconBorderEnabled", true)
-    styleCache.buffBarIconBorderColor = CfgValue(db, defaults, "buffBarIconBorderColor", CDM_C.WHITE)
-    styleCache.buffBarIconBorderSize = CfgValue(db, defaults, "buffBarIconBorderSize", 1)
-    styleCache.buffBarIconBorderInset = CfgValue(db, defaults, "buffBarIconBorderInset", 0)
-    styleCache.buffBarIconBorderTexture = CfgValue(db, defaults, "buffBarIconBorderTexture", "Blizzard Tooltip")
-    styleCache.buffBarBarBorderEnabled = CfgValue(db, defaults, "buffBarBarBorderEnabled", true)
-    styleCache.buffBarBarBorderColor = CfgValue(db, defaults, "buffBarBarBorderColor", CDM_C.WHITE)
-    styleCache.buffBarBarBorderSize = CfgValue(db, defaults, "buffBarBarBorderSize", 1)
-    styleCache.buffBarBarBorderInset = CfgValue(db, defaults, "buffBarBarBorderInset", 0)
-    styleCache.buffBarBarBorderTexture = CfgValue(db, defaults, "buffBarBarBorderTexture", "Blizzard Tooltip")
-    styleCache.buffBarBarBackgroundEnabled = CfgValue(db, defaults, "buffBarBarBackgroundEnabled", true)
-    styleCache.buffBarBarBackgroundColor = CfgValue(db, defaults, "buffBarBarBackgroundColor", { r = 0, g = 0, b = 0, a = 0.4 })
-    styleCache.buffBarBarBackgroundTexture = CfgValue(db, defaults, "buffBarBarBackgroundTexture", "Blizzard")
-    styleCache.buffBarBarBackgroundInset = CfgValue(db, defaults, "buffBarBarBackgroundInset", 0)
-    styleCache.buffBarBarPaddingLeft = CfgValue(db, defaults, "buffBarBarPaddingLeft", 0)
-    styleCache.buffBarBarPaddingRight = CfgValue(db, defaults, "buffBarBarPaddingRight", 0)
-    styleCache.buffBarBarPaddingTop = CfgValue(db, defaults, "buffBarBarPaddingTop", 0)
-    styleCache.buffBarBarPaddingBottom = CfgValue(db, defaults, "buffBarBarPaddingBottom", 0)
-    styleCache.buffBarTextContainerLevelOffset = CfgValue(db, defaults, "buffBarTextContainerLevelOffset", 6)
-    styleCache.buffBarIconContainerLevelOffset = CfgValue(db, defaults, "buffBarIconContainerLevelOffset", 4)
-    styleCache.buffBarCooldownContainerLevelOffset = CfgValue(db, defaults, "buffBarCooldownContainerLevelOffset", 5)
 
-    styleCache.isBorderActive = CfgValue(db, defaults, "borderEnabled", true)
+    styleCache.isOneBorderMode = Pixel.IsOneBorderMode()
+    styleCache.isBorderActive = CfgValue(db, defaults, "borderFile", "1 Pixel") ~= "None"
     styleCache.borderSize = CfgValue(db, defaults, "borderSize", 1)
-    styleCache.borderInset = CfgValue(db, defaults, "borderInset", 0)
-    styleCache.borderTexture = CfgValue(db, defaults, "borderTexture", "Blizzard Tooltip")
-    styleCache.fontPath = LSM and LSM:Fetch("font", styleCache.textFont) or STANDARD_TEXT_FONT
+
+    CDM_C.RefreshBaseFontCache()
+    styleCache.fontPath = CDM_C.GetBaseFontPath()
+
+    cdFont:SetFont(styleCache.fontPath, FontSize(styleCache.cooldownFontSize), styleCache.textFontOutline)
+    cdFontBuff:SetFont(styleCache.fontPath, FontSize(styleCache.buffCooldownFontSize), styleCache.textFontOutline)
+
+    styleCache.cooldownDecimalThreshold = CfgValue(db, defaults, "cooldownDecimalThreshold")
+    styleCache.cooldownColorThresholdEnabled = CfgValue(db, defaults, "cooldownColorThresholdEnabled")
+    styleCache.cooldownColorThreshold = CfgValue(db, defaults, "cooldownColorThreshold")
+    styleCache.cooldownColorThresholdColor = CfgValue(db, defaults, "cooldownColorThresholdColor")
+
+    CDM.CooldownFormatter.Rebuild(styleCache)
 end
 
 CDM.RefreshStyleCache = RefreshStyleCache
+CDM.styleCache = styleCache
+
+
+
+local function StyleCooldownTextElement(text, fontPath, fontSize, fontOutline, color, init)
+    if not text then return end
+    color = color or CDM_C.WHITE
+    if init then
+        text:SetIgnoreParentScale(true)
+        text:ClearAllPoints()
+        text:SetPoint("CENTER", 0, 0)
+        text:SetJustifyH("CENTER")
+        text:SetJustifyV("MIDDLE")
+        text:SetShadowOffset(0, 0)
+        text:SetDrawLayer("OVERLAY", 7)
+    end
+    text:SetFont(fontPath, FontSize(fontSize), fontOutline)
+    text:SetTextColor(color.r, color.g, color.b, color.a or 1)
+end
 
 local function SafeEquals(v, expected)
     return (type(v) ~= "number" or canaccessvalue(v)) and v == expected
@@ -418,6 +373,9 @@ local function GetEquippedItemRealCooldown(frame)
         return false, nil, nil, nil
     end
 
+    -- Blizzard has already filtered shared trinket/GCD categories when it sets
+    -- isOnActualCooldown. Reuse that decision so an unused trinket never shows
+    -- the shared lockout as its own cooldown.
     local actualState = frame.isOnActualCooldown
     if actualState ~= nil and canaccessvalue(actualState) and actualState ~= true then
         return false, nil, nil, nil
@@ -457,7 +415,6 @@ local function QueueEquippedItemNativeRefresh(frame)
         if not frame.cooldownID then return end
         local entry = FindAuraOverlayEntry(frame)
         if not entry or entry.auraOverlay ~= true then return end
-
         pcall(frame.RefreshData, frame)
     end)
 end
@@ -677,6 +634,8 @@ local function ApplyCooldownWidget(frame, entry, auraActive, sid)
             frame.cdmCooldownOverlayStyleApplied = nil
         end
         if isEquippedItem then
+            -- Show Overlay is the only setting allowed to expose Blizzard's aura
+            -- timer. Without it, always render the equipped item's real cooldown.
             cd:SetReverse(false)
             cd:SetUseAuraDisplayTime(false)
             cd:SetDrawEdge(false)
@@ -849,4 +808,909 @@ local function EnsureFrameHooks(frame, hookType)
     end
 end
 
--- Remaining file content unchanged from current branch; full replacement intentionally omitted here would be invalid.
+local function InvalidateUtilCache()
+    if CDM.InvalidateUtilityVisibleCountCache then
+        CDM:InvalidateUtilityVisibleCountCache()
+    end
+end
+
+local function SetupUtilityVisibilityHooks(frame)
+    if not frame or frame.cdmUtilityVisibilityHooked or not frame.HookScript then
+        return
+    end
+
+    frame.cdmUtilityVisibilityHooked = true
+    frame:HookScript("OnShow", InvalidateUtilCache)
+    frame:HookScript("OnHide", InvalidateUtilCache)
+end
+
+local function ApplyIconTextureLayout(texture, frame, iconWidth, iconHeight, zoomAmount)
+    CDM_C.ApplyIconTexCoord(texture, zoomAmount, iconWidth, iconHeight)
+    texture:ClearAllPoints()
+    texture:SetAllPoints(frame)
+    DisableTextureSnap(texture)
+end
+
+local function RemoveBlizzardIconMask(iconTexture, flagName)
+    if not iconTexture then
+        return
+    end
+
+    if iconTexture[flagName] then
+        return
+    end
+
+    for i = 1, iconTexture:GetNumMaskTextures() do
+        local mask = iconTexture:GetMaskTexture(i)
+        if mask and SafeEquals(mask:GetAtlas(), BLIZZARD_ICON_MASK_ATLAS) then
+            iconTexture:RemoveMaskTexture(mask)
+            iconTexture[flagName] = true
+            iconTexture[flagName .. "Source"] = mask
+            break
+        end
+    end
+end
+
+local function RestoreBlizzardIconMask(iconTexture, flagName)
+    if not iconTexture then
+        return
+    end
+    if not iconTexture[flagName] then
+        return
+    end
+    local source = iconTexture[flagName .. "Source"]
+    if source then
+        iconTexture:AddMaskTexture(source)
+    end
+    iconTexture[flagName] = false
+    iconTexture[flagName .. "Source"] = nil
+end
+
+local function EnsureIconBorder(frame, host, borderKey, active, version)
+    local existing = frame[borderKey]
+
+    if not active then
+        if existing then existing:Hide() end
+        return
+    end
+
+    local versionKey = borderKey .. "Version"
+    if frame[versionKey] ~= version or not existing then
+        local border = BORDER:CreateBorder(host, true)
+        if BORDER.activeBorders[host] then
+            BORDER.activeBorders[host].colorFrame = frame
+        end
+        frame[borderKey] = border
+        frame[versionKey] = version
+        if border and border.SetBackdropBorderColor then
+            local color = BORDER:ResolveCurrentBorderColor(frame)
+            border:SetBackdropBorderColor(color.r, color.g, color.b, 1)
+        end
+    elseif existing and not existing:IsShown() then
+        existing:Show()
+    end
+end
+
+function CDM:ApplyStyle(frame, vName, forceUpdate)
+    if not frame then return end
+
+    frame.cdmViewerName = vName
+    local fullUpdate = forceUpdate or not frame.cdmHooksInitialized or frame.cdmLastStyledVName ~= vName
+    local styleVersion = CDM.styleCacheVersion or 0
+    local borderStyleVersion = CDM.borderStyleVersion or 0
+
+    if not styleCache.fontPath then
+        RefreshStyleCache()
+    end
+
+    local desc = VIEWER_DESC[vName]
+    local isBuff = desc and desc.isBuff
+    local isCooldown = desc and desc.isCooldown
+
+    local groupData
+    if isCooldown then
+        local groupIdx = CDM.CheckCdGroupMatch and CDM.CheckCdGroupMatch(frame)
+        if groupIdx then
+            local sets = CDM.CooldownGroupSets
+            groupData = sets and sets.groups and sets.groups[groupIdx]
+        end
+    end
+
+    local borderActive = styleCache.isBorderActive
+
+    local iconWidth, iconHeight
+    if groupData then
+        iconWidth = Snap(groupData.iconWidth or 30)
+        iconHeight = Snap(groupData.iconHeight or 30)
+    elseif desc and (desc.sizeKey or desc.widthKey) then
+        local w, h = ResolveIconSize(desc, frame.cdmRow)
+        iconWidth = Snap(w)
+        iconHeight = Snap(h)
+    else
+        iconWidth = Snap(30)
+        iconHeight = Snap(30)
+    end
+
+    local fontSpellID = isCooldown and GetEffectiveCooldownSpellID(frame) or nil
+
+    local needsVisualUpdate = fullUpdate
+        or frame.cdmLastStyleVersion ~= styleVersion
+        or frame.cdmLastStyledW ~= iconWidth
+        or frame.cdmLastStyledH ~= iconHeight
+        or frame.cdmLastFontSpellID ~= fontSpellID
+
+    if not needsVisualUpdate then
+        local actualW = frame:GetWidth() or 0
+        local actualH = frame:GetHeight() or 0
+        needsVisualUpdate = (actualW > 1 and math_abs(actualW - iconWidth) > 0.01)
+                         or (actualH > 1 and math_abs(actualH - iconHeight) > 0.01)
+    end
+
+    if needsVisualUpdate then
+        frame:SetSize(iconWidth, iconHeight)
+
+        local glow = frame.SpellActivationAlert
+        if glow then
+            glow:SetFrameLevel(frame:GetFrameLevel() + 5)
+            if CDM.Glow and CDM.Glow.HideBlizzardGlow then
+                CDM.Glow:HideBlizzardGlow(frame)
+            else
+                glow:SetAlpha(0)
+                glow:Hide()
+            end
+        end
+
+        local zoomIcons = styleCache.zoomIcons
+        local zoomAmount = zoomIcons and styleCache.zoomAmount or 0
+        ApplyIconTextureLayout(frame.Icon, frame, iconWidth, iconHeight, zoomAmount)
+
+        frame.Cooldown:ClearAllPoints()
+        frame.Cooldown:SetAllPoints(frame)
+
+        frame.Cooldown:SetCountdownFont(isBuff and "KCDM_CDFont_Buff" or "KCDM_CDFont")
+        frame.Cooldown:SetCountdownFormatter(CDM.CooldownFormatter.Get())
+
+        local hideAtlas = styleCache.hideIconOverlay
+        local hideTexture = styleCache.hideIconOverlayTexture
+        if fullUpdate
+            or frame.cdmOverlayAtlasHidden ~= hideAtlas
+            or frame.cdmOverlayTextureHidden ~= hideTexture then
+            ApplyOverlayVisibility(hideAtlas, hideTexture, frame:GetRegions())
+            frame.cdmOverlayAtlasHidden = hideAtlas
+            frame.cdmOverlayTextureHidden = hideTexture
+        end
+
+        if hideTexture then
+            RemoveBlizzardIconMask(frame.Icon, "cdmIconMaskRemoved")
+        elseif frame.Icon.cdmIconMaskRemoved then
+            RestoreBlizzardIconMask(frame.Icon, "cdmIconMaskRemoved")
+        end
+
+        EnsureIconBorder(frame, frame, "cdmBorder", borderActive, borderStyleVersion)
+
+        if isCooldown then
+            if frame.ChargeCount then
+                frame.ChargeCount:SetFrameLevel(frame:GetFrameLevel() + 15)
+            end
+
+            local chargeText = frame.ChargeCount and frame.ChargeCount.Current
+            if chargeText then
+                if not frame.cdmChargeTextHooked then
+                    frame.cdmChargeTextHooked = true
+                    hooksecurefunc(chargeText, "SetText", function(self, value)
+                        if type(value) == "number" then
+                            self:SetText(TruncateWhenZero(value))
+                        end
+                    end)
+                end
+                chargeText:SetIgnoreParentScale(true)
+            end
+        end
+
+        if isBuff then
+            if frame.Applications then
+                frame.Applications:SetFrameLevel(frame:GetFrameLevel() + 7)
+            end
+
+            local countText = frame.Applications and frame.Applications.Applications
+            if countText then
+                local fontPath = styleCache.fontPath
+                local textFontOutline = styleCache.textFontOutline
+                countText:SetIgnoreParentScale(true)
+                countText:SetFont(fontPath, FontSize(styleCache.countFontSize), textFontOutline)
+                countText:SetTextColor(styleCache.countColor.r, styleCache.countColor.g, styleCache.countColor.b, styleCache.countColor.a or 1)
+                countText:SetDrawLayer("OVERLAY", 7)
+                countText:SetShadowOffset(0, 0)
+
+                if desc and desc.hasCount then
+                    countText:ClearAllPoints()
+                    countText:SetPoint(styleCache.countPositionMain, frame, styleCache.countPositionMain,
+                        styleCache.countOffsetXMain, styleCache.countOffsetYMain)
+                end
+
+                frame.cdmCountStyle = nil
+            end
+
+        end
+
+        do
+            local fontPath = styleCache.fontPath
+            local textFontOutline = styleCache.textFontOutline
+            local effectiveCdFontSize, effectiveCdColor
+            local effectiveChargeFS, effectiveChargeColor
+            local effectiveChargePos, effectiveChargeOX, effectiveChargeOY
+
+            if isCooldown then
+                local spellID = fontSpellID
+
+                local isRow2 = frame.cdmRow == 2
+                local colorKey = (isRow2 and desc.chargeColorKey2) or desc.chargeColorKey
+                local posKey = (isRow2 and desc.chargePosKey2) or desc.chargePosKey
+                local oxKey = (isRow2 and desc.chargeOXKey2) or desc.chargeOXKey
+                local oyKey = (isRow2 and desc.chargeOYKey2) or desc.chargeOYKey
+                local viewerChargeColor = colorKey and styleCache[colorKey] or styleCache.chargeColor
+                local viewerChargePos = posKey and styleCache[posKey] or styleCache.chargePosition
+                local viewerChargeOX = oxKey and styleCache[oxKey] or styleCache.chargeOffsetX
+                local viewerChargeOY = oyKey and styleCache[oyKey] or styleCache.chargeOffsetY
+
+                if groupData then
+                    effectiveCdFontSize = groupData.cooldownFontSize or 12
+                    effectiveCdColor = groupData.cooldownColor
+                    effectiveChargeFS = groupData.chargeFontSize or 15
+                    effectiveChargeColor = groupData.chargeColor
+                    effectiveChargePos = groupData.chargePosition or "BOTTOMRIGHT"
+                    effectiveChargeOX = groupData.chargeOffsetX or 0
+                    effectiveChargeOY = groupData.chargeOffsetY or 0
+
+                    local spellOv = CDM.GetCooldownGroupSpellOverride(groupData, spellID)
+                    if spellOv and spellOv.textOverride then
+                        effectiveCdFontSize = spellOv.cooldownFontSize or effectiveCdFontSize
+                        effectiveCdColor = spellOv.cooldownColor or effectiveCdColor
+                        effectiveChargeFS = spellOv.chargeFontSize or effectiveChargeFS
+                        effectiveChargeColor = spellOv.chargeColor or effectiveChargeColor
+                        effectiveChargePos = spellOv.chargePosition or effectiveChargePos
+                        effectiveChargeOX = spellOv.chargeOffsetX or effectiveChargeOX
+                        effectiveChargeOY = spellOv.chargeOffsetY or effectiveChargeOY
+                    end
+
+                    effectiveCdColor = effectiveCdColor or styleCache.cooldownColor
+                    effectiveChargeColor = effectiveChargeColor or viewerChargeColor
+                else
+                    local ov = spellID and CDM:GetUngroupedCooldownOverride(spellID)
+                    if ov and ov.textOverride then
+                        local db = CDM.db
+                        effectiveCdFontSize = ov.cooldownFontSize or (db and db.cooldownFontSize or 15)
+                        effectiveCdColor = ov.cooldownColor or (db and db.cooldownColor) or styleCache.cooldownColor
+                        effectiveChargeFS = ov.chargeFontSize or (db and db.chargeFontSize or 15)
+                        effectiveChargeColor = ov.chargeColor or viewerChargeColor
+                        effectiveChargePos = ov.chargePosition or viewerChargePos
+                        effectiveChargeOX = ov.chargeOffsetX or viewerChargeOX
+                        effectiveChargeOY = ov.chargeOffsetY or viewerChargeOY
+                    else
+                        local cdFontKey = (desc.cdFontKey2 and isRow2) and desc.cdFontKey2 or desc.cdFontKey
+                        effectiveCdFontSize = styleCache[cdFontKey]
+                        effectiveCdColor = styleCache[desc.cdColorKey]
+                        local chargeFontKey = (desc.chargeKey2 and isRow2) and desc.chargeKey2 or desc.chargeKey
+                        effectiveChargeFS = chargeFontKey and styleCache[chargeFontKey] or styleCache.chargeFontSize
+                        effectiveChargeColor = viewerChargeColor
+                        effectiveChargePos = viewerChargePos
+                        effectiveChargeOX = viewerChargeOX
+                        effectiveChargeOY = viewerChargeOY
+                    end
+                end
+            else
+                local cdFontKey = desc and ((desc.cdFontKey2 and frame.cdmRow == 2) and desc.cdFontKey2 or desc.cdFontKey) or "cooldownFontSize"
+                effectiveCdFontSize = styleCache[cdFontKey]
+                effectiveCdColor = styleCache[desc and desc.cdColorKey or "cooldownColor"]
+            end
+
+            local cooldownText = frame.Cooldown.Text or frame.Cooldown.text
+            StyleCooldownTextElement(cooldownText, fontPath, effectiveCdFontSize, textFontOutline, effectiveCdColor, fullUpdate)
+
+            StyleCooldownFontStringsInRegions(
+                fontPath, effectiveCdFontSize, textFontOutline, effectiveCdColor,
+                fullUpdate, frame.Cooldown:GetRegions()
+            )
+
+            if frame.Time then
+                StyleCooldownTextElement(frame.Time, fontPath, effectiveCdFontSize, textFontOutline, effectiveCdColor, fullUpdate)
+            end
+            if frame.Duration then
+                StyleCooldownTextElement(frame.Duration, fontPath, effectiveCdFontSize, textFontOutline, effectiveCdColor, fullUpdate)
+            end
+
+            if isCooldown then
+                local chargeText = frame.ChargeCount and frame.ChargeCount.Current
+                if chargeText then
+                    chargeText:ClearAllPoints()
+                    SetPoint(chargeText, effectiveChargePos, frame, effectiveChargePos, effectiveChargeOX, effectiveChargeOY)
+                    chargeText:SetFont(fontPath, FontSize(effectiveChargeFS), textFontOutline)
+                    chargeText:SetTextColor(effectiveChargeColor.r, effectiveChargeColor.g, effectiveChargeColor.b, effectiveChargeColor.a or 1)
+                    if fullUpdate then
+                        chargeText:SetDrawLayer("OVERLAY", 7)
+                        chargeText:SetShadowOffset(0, 0)
+                    end
+                end
+            end
+        end
+
+        if isBuff then
+            frame.Cooldown:SetReverse(true)
+        end
+
+        frame.cdmLastStyleVersion = styleVersion
+        frame.cdmLastStyledW = iconWidth
+        frame.cdmLastStyledH = iconHeight
+        frame.cdmLastStyledVName = vName
+        frame.cdmLastFontSpellID = fontSpellID
+    end
+
+    if isBuff then
+        if fullUpdate and desc then
+            EnsureFrameHooks(frame, desc.hookType)
+        end
+
+        self:ProcessBuffViewerOverrides(frame)
+
+        local borderInner = frame.cdmBorder
+        if borderInner and borderInner.SetBackdropBorderColor then
+            local sid = GetCastSpellID(frame) or (frame.isCustomBuff and IsSafeNumber(frame.spellID) and frame.spellID) or nil
+            local catID = frame.cdmBuffCategorySpellID
+            if fullUpdate
+               or frame.cdmLastBuffBorderSpellID ~= sid
+               or frame.cdmLastBuffBorderCatID ~= catID
+               or frame.cdmLastBuffBorderColorVer ~= borderStyleVersion
+               or frame.cdmLastBuffBorderStyleVer ~= styleVersion then
+                frame.cdmLastBuffBorderSpellID = sid
+                frame.cdmLastBuffBorderCatID = catID
+                frame.cdmLastBuffBorderColorVer = borderStyleVersion
+                frame.cdmLastBuffBorderStyleVer = styleVersion
+
+                local configColor = styleCache.borderColor
+                local r, g, b = configColor.r, configColor.g, configColor.b
+
+                local customColor
+                local candidates = GetSpellIDCandidates(self, frame)
+                for _, id in ipairs(candidates) do
+                    customColor = GetColorForSpellID(id)
+                    if customColor then break end
+                end
+
+                if customColor then
+                    r, g, b = customColor.r or r, customColor.g or g, customColor.b or b
+                end
+
+                BORDER:CommitResolvedBorderColor(frame, r, g, b)
+            end
+        end
+    else
+        if fullUpdate and desc then
+            EnsureFrameHooks(frame, desc.hookType)
+        end
+        if desc and desc.hasUtilVisibility then
+            SetupUtilityVisibilityHooks(frame)
+        end
+    end
+
+    if desc and desc.hasOverride then
+        if fullUpdate then
+            local iconTex = frame.Icon
+            if not frame.cdmDesatHooked then
+                frame.cdmDesatHooked = true
+                hooksecurefunc(iconTex, "SetDesaturated", function(_, desaturated)
+                    if frame.cdmInternalWrite then return end
+                    local entry = FindAuraOverlayEntry(frame)
+                    local auraActive = entry and entry.auraOverlay == true and IsNativeAuraActive(frame) or false
+                    ApplyIconDesat(frame, entry, auraActive, GetCastSpellID(frame), desaturated)
+                end)
+            end
+
+            local cd = frame.Cooldown
+            if not frame.cdmCooldownHooked then
+                frame.cdmCooldownHooked = true
+
+                local function RefreshCooldownAppearanceAfterBlizzard()
+                    if not frame or not frame.Icon then return end
+                    local entry = FindAuraOverlayEntry(frame)
+                    local auraActive = entry and entry.auraOverlay == true and IsNativeAuraActive(frame) or false
+                    ApplyCooldownIconAppearance(frame, entry, auraActive, GetCastSpellID(frame))
+                end
+
+                hooksecurefunc(cd, "SetCooldown", function()
+                    if frame.cdmInternalWrite then return end
+                    local entry = FindAuraOverlayEntry(frame)
+                    if entry
+                       or frame.cdmLastAuraActive
+                       or IsNativeAuraActive(frame)
+                       or frame.cdmCooldownOverlayStyleApplied
+                       or HasChargeSource(frame) then
+                        ApplyBaseSwipeStyle(cd, frame)
+                        CDM:RefreshFrameVisuals(frame, true)
+                        RefreshCooldownAppearanceAfterBlizzard()
+                        return
+                    end
+                    ApplyBaseSwipeStyle(cd, frame)
+                    cd:SetDrawEdge(false)
+                    cd:SetHideCountdownNumbers(false)
+                    if styleCache.hideGCDSwipe and not IsEquippedItemCooldownFrame(frame) then
+                        local sid = GetCastSpellID(frame)
+                        local realDur = sid and GetSpellCooldownDuration(sid, true)
+                        if realDur then
+                            cd:SetCooldownFromDurationObject(realDur)
+                        end
+                    end
+                    RefreshCooldownAppearanceAfterBlizzard()
+                end)
+
+                hooksecurefunc(cd, "Clear", function()
+                    if frame.cdmInternalWrite then return end
+                    local entry = FindAuraOverlayEntry(frame)
+                    if entry or frame.cdmLastAuraActive then
+                        CDM:RefreshFrameVisuals(frame, true)
+                    end
+                    RefreshCooldownAppearanceAfterBlizzard()
+                end)
+
+                if cd.HookScript and not frame.cdmCooldownDoneAppearanceHooked then
+                    frame.cdmCooldownDoneAppearanceHooked = true
+                    cd:HookScript("OnCooldownDone", function()
+                        RefreshCooldownAppearanceAfterBlizzard()
+                    end)
+                end
+            end
+        end
+
+        local overlayEntry = FindAuraOverlayEntry(frame)
+        if fullUpdate or overlayEntry then
+            if fullUpdate then
+                ApplyBaseSwipeStyle(frame.Cooldown, frame)
+            end
+            self:RefreshFrameVisuals(frame)
+        end
+    end
+
+    if fullUpdate then
+        frame.cdmHooksInitialized = true
+    end
+end
+
+local function InstallBuffBarVisibilityShowHook(frame, hookKey, textElement, resolvedFlagKey)
+    if not textElement or frame[hookKey] then
+        return
+    end
+
+    frame[hookKey] = true
+    hooksecurefunc(textElement, "Show", function(self)
+        if frame[resolvedFlagKey] ~= false then
+            return
+        end
+        self:Hide()
+        self:SetAlpha(0)
+    end)
+end
+
+local function InstallBarNameTextHook(frame, nameText)
+    if not nameText or frame.cdmNameTextHooked then return end
+    frame.cdmNameTextHooked = true
+    hooksecurefunc(nameText, "SetText", function(self, text)
+        if frame.cdmNameTextApplyGuard then return end
+        local custom = frame.cdmResolvedCustomName
+        if not custom or custom == "" then return end
+        if text == custom then return end
+        frame.cdmNameTextApplyGuard = true
+        self:SetText(custom)
+        frame.cdmNameTextApplyGuard = false
+    end)
+end
+
+local function ResolveBarSpellOverride(frame, groupData)
+    local spellID = frame.cdmBarGroupSpellID
+    if groupData then
+        if groupData.spellOverrides and spellID then
+            return CDM:ResolveBarOverrideEntry(groupData.spellOverrides, spellID)
+        end
+        return nil
+    end
+    local db = CDM.db
+    if not db or not db.ungroupedBarOverrides then return nil end
+    local specID = CDM.GetCurrentSpecID and CDM:GetCurrentSpecID() or nil
+    local specOv = specID and db.ungroupedBarOverrides[specID]
+    if not specOv then return nil end
+    if spellID then
+        local ov = CDM:ResolveBarOverrideEntry(specOv, spellID)
+        if ov then return ov end
+    end
+    if CDM.GetSpellIDCandidates then
+        local candidates = CDM:GetSpellIDCandidates(frame)
+        if candidates then
+            for _, id in ipairs(candidates) do
+                local ov = CDM:ResolveBarOverrideEntry(specOv, id)
+                if ov then return ov end
+            end
+        end
+    end
+    return nil
+end
+
+CDM.ResolveBarSpellOverride = ResolveBarSpellOverride
+
+local function ResolveBarField(groupData, groupKey, dbKey)
+    if groupData and groupData[groupKey] ~= nil then
+        return groupData[groupKey]
+    end
+    return styleCache[dbKey]
+end
+
+function CDM:ApplyBarStyle(frame, vName, iconPositionOverride, frameWidthOverride, frameHeightOverride, groupData, spellOvOverride)
+    if not frame then return end
+
+    frame.cdmViewerName = vName
+
+    if not styleCache.fontPath then
+        RefreshStyleCache()
+    end
+
+    local spellOv = spellOvOverride or ResolveBarSpellOverride(frame, groupData)
+
+    local iconPosition
+    if iconPositionOverride ~= nil then
+        iconPosition = iconPositionOverride
+    elseif spellOv and spellOv.iconPosition ~= nil then
+        iconPosition = spellOv.iconPosition
+    else
+        iconPosition = ResolveBarField(groupData, "iconPosition", "buffBarIconPosition")
+    end
+
+    local styleVersion = CDM.styleCacheVersion or 0
+    local targetFrameWidth = frameWidthOverride or (frame.GetWidth and frame:GetWidth()) or 0
+    local targetFrameHeight = frameHeightOverride or (frame.GetHeight and frame:GetHeight()) or 0
+    local barStyleNeedsUpdate = not frame.cdmBarStyled
+        or frame.cdmLastBarStyleVersion ~= styleVersion
+        or frame.cdmLastBarW ~= targetFrameWidth
+        or frame.cdmLastBarH ~= targetFrameHeight
+        or frame.cdmLastBarIconPosition ~= iconPosition
+        or frame.cdmLastBarOv ~= spellOv
+
+    local borderVersion = CDM.borderStyleVersion or 0
+
+    local bar = frame.Bar
+
+    if not frame.cdmBarHidesDone then
+        if frame.DebuffBorder then
+            frame.DebuffBorder:Hide()
+        end
+        EnsureFrameHooks(frame, "bar")
+        if frame.cdmBorder then
+            frame.cdmBorder:Hide()
+        end
+
+        if bar then
+            if bar.BarBG then
+                bar.BarBG:Hide()
+                bar.BarBG:SetAlpha(0)
+            end
+
+            if bar.Pip then
+                bar.Pip:Hide()
+                bar.Pip:SetAlpha(0)
+                if not frame.cdmPipHooked then
+                    frame.cdmPipHooked = true
+                    hooksecurefunc(bar.Pip, "Show", function(self)
+                        self:Hide()
+                        self:SetAlpha(0)
+                    end)
+                end
+            end
+        end
+        frame.cdmBarHidesDone = true
+    end
+
+    if not frame.cdmBarContentHooked and frame.SetBarContent then
+        frame.cdmBarContentHooked = true
+        hooksecurefunc(frame, "SetBarContent", function()
+            frame.cdmBarStyled = false
+            if frame.cdmLastBarIconPosition == "HIDDEN" then
+                if frame.Icon then frame.Icon:Hide() end
+                local bar = frame.Bar
+                if bar then
+                    bar:ClearAllPoints()
+                    SetPoint(bar, "LEFT", frame, "LEFT", 0, 0)
+                    SetPoint(bar, "RIGHT", frame, "RIGHT", 0, 0)
+                end
+            end
+        end)
+    end
+
+    if not barStyleNeedsUpdate then
+        return
+    end
+
+    local barHeight = (targetFrameHeight and targetFrameHeight > 0) and targetFrameHeight or ResolveBarField(groupData, "barHeight", "buffBarHeight")
+    if spellOv and type(spellOv.barHeight) == "number" and spellOv.barHeight > 0 then
+        barHeight = spellOv.barHeight
+    end
+    barHeight = Snap(barHeight)
+    local iconGap = Snap(ResolveBarField(groupData, "iconGap", "buffBarIconGap") or 0)
+    local showName = ResolveBarField(groupData, "showName", "buffBarShowName")
+    if spellOv and spellOv.nameHidden == true then showName = false end
+    local showDuration = ResolveBarField(groupData, "showDuration", "buffBarShowDuration")
+    if spellOv and spellOv.durationHidden == true then showDuration = false end
+    local barTextureName = ResolveBarField(groupData, "texture", "buffBarTexture")
+    local barColor = (spellOv and spellOv.barColor) or ResolveBarField(groupData, "barColor", "buffBarColor")
+    local bgColor = (spellOv and spellOv.backgroundColor) or ResolveBarField(groupData, "backgroundColor", "buffBarBackgroundColor")
+    local fillDirection = (spellOv and spellOv.barFillDirection) or ResolveBarField(groupData, "barFillDirection", "buffBarFillDirection") or "LEFT_TO_RIGHT"
+    local customName = spellOv and type(spellOv.customName) == "string" and spellOv.customName ~= "" and spellOv.customName or nil
+    local fontPath = styleCache.fontPath
+    local textFontOutline = styleCache.textFontOutline
+    local zoomIcons = styleCache.zoomIcons
+    local zoomAmount = zoomIcons and styleCache.zoomAmount or 0
+    local nameFontSize = ResolveBarField(groupData, "nameFontSize", "buffBarNameFontSize")
+    local nameMaxChars = ResolveBarField(groupData, "nameMaxChars", "buffBarNameMaxChars")
+    local nameColor = ResolveBarField(groupData, "nameColor", "buffBarNameColor")
+    local nameOffsetX = ResolveBarField(groupData, "nameOffsetX", "buffBarNameOffsetX")
+    local nameOffsetY = ResolveBarField(groupData, "nameOffsetY", "buffBarNameOffsetY")
+    local durationFontSize = ResolveBarField(groupData, "durationFontSize", "buffBarDurationFontSize")
+    local durationColor = ResolveBarField(groupData, "durationColor", "buffBarDurationColor")
+    local durationPosition = ResolveBarField(groupData, "durationPosition", "buffBarDurationPosition")
+    if durationPosition ~= "LEFT" and durationPosition ~= "RIGHT" then durationPosition = "CENTER" end
+    local durationOffsetX = ResolveBarField(groupData, "durationOffsetX", "buffBarDurationOffsetX")
+    local durationOffsetY = ResolveBarField(groupData, "durationOffsetY", "buffBarDurationOffsetY")
+    local showApplications = ResolveBarField(groupData, "showApplications", "buffBarShowApplications")
+    local appFontSize = ResolveBarField(groupData, "applicationsFontSize", "buffBarApplicationsFontSize")
+    local appColor = ResolveBarField(groupData, "applicationsColor", "buffBarApplicationsColor")
+    local appPosition = ResolveBarField(groupData, "applicationsPosition", "buffBarApplicationsPosition")
+    local appOffsetX = ResolveBarField(groupData, "applicationsOffsetX", "buffBarApplicationsOffsetX")
+    local appOffsetY = ResolveBarField(groupData, "applicationsOffsetY", "buffBarApplicationsOffsetY")
+
+    frame.cdmResolvedShowName = showName and true or false
+    frame.cdmResolvedShowDuration = showDuration and true or false
+    frame.cdmResolvedShowApplications = showApplications and true or false
+
+    local customNameChanged = frame.cdmResolvedCustomName ~= customName
+    frame.cdmResolvedCustomName = customName
+
+    local barTexture = (LSM and LSM:Fetch("statusbar", barTextureName)) or "Interface\\TargetingFrame\\UI-StatusBar"
+
+    local iconFrame = frame.Icon
+    local iconSize = barHeight
+
+    frame.cdmLastBarIconPosition = iconPosition
+
+    if iconFrame then
+        if iconPosition == "HIDDEN" then
+            if frame.cdmIconBorder then
+                frame.cdmIconBorder:Hide()
+            end
+            iconFrame:Hide()
+        else
+            iconFrame:Show()
+            Pixel.SetSize(iconFrame, iconSize, iconSize)
+
+            iconFrame:ClearAllPoints()
+            if iconPosition == "RIGHT" then
+                SetPoint(iconFrame, "RIGHT", frame, "RIGHT", 0, 0)
+            else
+                SetPoint(iconFrame, "LEFT", frame, "LEFT", 0, 0)
+            end
+
+            local iconTex = iconFrame.Icon
+            if iconTex then
+                if iconTex.ClearAllPoints then
+                    iconTex:ClearAllPoints()
+                    if styleCache.isOneBorderMode then
+                        local onePx = Pixel.GetSize()
+                        local configuredSize = styleCache.borderSize or 1
+                        local borderPixels = math_max(1, math_floor(configuredSize / onePx))
+                        local inset = math_max(0, (borderPixels * onePx) - onePx)
+                        iconTex:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", inset, -inset)
+                        iconTex:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -inset, inset)
+                    else
+                        iconTex:SetAllPoints(iconFrame)
+                    end
+                end
+                if styleCache.hideIconOverlayTexture then
+                    RemoveBlizzardIconMask(iconTex, "cdmBarIconMaskRemoved")
+                elseif iconTex.cdmBarIconMaskRemoved then
+                    RestoreBlizzardIconMask(iconTex, "cdmBarIconMaskRemoved")
+                end
+                CDM_C.ApplyIconTexCoord(iconTex, zoomAmount, iconSize, iconSize)
+                DisableTextureSnap(iconTex)
+            end
+
+            ApplyOverlayVisibility(styleCache.hideIconOverlay, styleCache.hideIconOverlayTexture, iconFrame:GetRegions())
+
+            EnsureIconBorder(frame, iconFrame, "cdmIconBorder", styleCache.isBorderActive, borderVersion)
+        end
+    end
+    if bar then
+        bar:ClearAllPoints()
+        bar:SetHeight(barHeight)
+
+        if iconPosition == "HIDDEN" then
+            SetPoint(bar, "LEFT", frame, "LEFT", 0, 0)
+            SetPoint(bar, "RIGHT", frame, "RIGHT", 0, 0)
+        elseif iconPosition == "RIGHT" then
+            SetPoint(bar, "LEFT", frame, "LEFT", 0, 0)
+            SetPoint(bar, "RIGHT", iconFrame or frame, iconFrame and "LEFT" or "RIGHT", iconFrame and -iconGap or 0, 0)
+        else
+            SetPoint(bar, "LEFT", iconFrame or frame, iconFrame and "RIGHT" or "LEFT", iconFrame and iconGap or 0, 0)
+            SetPoint(bar, "RIGHT", frame, "RIGHT", 0, 0)
+        end
+
+        bar:SetStatusBarTexture(barTexture)
+        DisableTextureSnap(bar:GetStatusBarTexture())
+        bar:SetStatusBarColor(barColor.r, barColor.g, barColor.b, barColor.a or 1)
+        if bar.SetReverseFill then
+            bar:SetReverseFill(fillDirection == "LEFT_TO_RIGHT")
+        end
+
+        if not frame.cdmBarBackground then
+            frame.cdmBarBackground = bar:CreateTexture(nil, "BACKGROUND", nil, -1)
+        end
+        frame.cdmBarBackground:ClearAllPoints()
+        frame.cdmBarBackground:SetAllPoints(bar)
+        DisableTextureSnap(frame.cdmBarBackground)
+        frame.cdmBarBackground:SetTexture(barTexture)
+        frame.cdmBarBackground:SetVertexColor(bgColor.r, bgColor.g, bgColor.b, bgColor.a or 0.8)
+
+        local nameText = bar.Name
+        local durationText = bar.Duration
+        local wantsNameText = showName and nameText
+        local wantsDurationText = showDuration and durationText
+
+        if wantsNameText or wantsDurationText then
+            if not frame.cdmBarTextContainer then
+                frame.cdmBarTextContainer = CreateFrame("Frame", nil, bar)
+                frame.cdmBarTextContainer:SetAllPoints(bar)
+            end
+            frame.cdmBarTextContainer:SetFrameLevel(bar:GetFrameLevel() + 6)
+            frame.cdmBarTextContainer:Show()
+
+            if nameText then
+                InstallBuffBarVisibilityShowHook(frame, "cdmNameHooked", nameText, "cdmResolvedShowName")
+                InstallBarNameTextHook(frame, nameText)
+                nameText:SetParent(frame.cdmBarTextContainer)
+                if showName then
+                    nameText:SetAlpha(1)
+                    nameText:Show()
+                    nameText:SetIgnoreParentScale(true)
+                    nameText:SetFont(fontPath, FontSize(nameFontSize), textFontOutline)
+                    nameText:SetTextColor(nameColor.r, nameColor.g, nameColor.b, nameColor.a or 1)
+                    nameText:SetShadowOffset(0, 0)
+                    nameText:SetDrawLayer("OVERLAY", 7)
+                    nameText:SetWordWrap(false)
+                    nameText:SetNonSpaceWrap(false)
+                    nameText:ClearAllPoints()
+                    SetPoint(nameText, "LEFT", bar, "LEFT", nameOffsetX, nameOffsetY)
+                    if nameMaxChars and nameMaxChars > 0 then
+                        nameText:SetWidth(Snap(nameMaxChars * FontSize(nameFontSize) * 0.55))
+                    else
+                        SetPoint(nameText, "RIGHT", bar, "RIGHT", -30, nameOffsetY)
+                        nameText:SetWidth(0)
+                    end
+                else
+                    nameText:Hide()
+                    nameText:SetAlpha(0)
+                end
+            end
+
+            if durationText then
+                InstallBuffBarVisibilityShowHook(frame, "cdmDurationHooked", durationText, "cdmResolvedShowDuration")
+                durationText:SetParent(frame.cdmBarTextContainer)
+                if showDuration then
+                    durationText:SetAlpha(1)
+                    durationText:Show()
+                    durationText:SetIgnoreParentScale(true)
+                    durationText:SetFont(fontPath, FontSize(durationFontSize), textFontOutline)
+                    durationText:SetTextColor(durationColor.r, durationColor.g, durationColor.b, durationColor.a or 1)
+                    durationText:SetShadowOffset(0, 0)
+                    durationText:SetDrawLayer("OVERLAY", 7)
+                    durationText:SetJustifyH(durationPosition)
+                    durationText:ClearAllPoints()
+                    if durationPosition == "CENTER" then
+                        SetPoint(durationText, "CENTER", frame, "CENTER", durationOffsetX, durationOffsetY)
+                    else
+                        SetPoint(durationText, durationPosition, bar, durationPosition, durationOffsetX, durationOffsetY)
+                    end
+                else
+                    durationText:Hide()
+                    durationText:SetAlpha(0)
+                end
+            end
+        else
+            if frame.cdmBarTextContainer then frame.cdmBarTextContainer:Hide() end
+            if bar.Name then bar.Name:Hide(); bar.Name:SetAlpha(0) end
+            if bar.Duration then bar.Duration:Hide(); bar.Duration:SetAlpha(0) end
+        end
+
+        local appText = iconFrame and iconFrame.Applications
+        if appText then
+            local canShowApplications = showApplications
+            if canShowApplications then
+                if not frame.cdmBarAppTextContainer then
+                    frame.cdmBarAppTextContainer = CreateFrame("Frame", nil, bar)
+                    frame.cdmBarAppTextContainer:SetAllPoints(bar)
+                end
+                frame.cdmBarAppTextContainer:SetFrameLevel(bar:GetFrameLevel() + 6)
+
+                frame.cdmBarAppTextContainer:Show()
+                InstallBuffBarVisibilityShowHook(frame, "cdmAppHooked", appText, "cdmResolvedShowApplications")
+                appText:SetParent(frame.cdmBarAppTextContainer)
+                appText:SetAlpha(1)
+                appText:Show()
+                appText:SetIgnoreParentScale(true)
+                appText:SetFont(fontPath, FontSize(appFontSize), textFontOutline)
+                appText:SetTextColor(appColor.r, appColor.g, appColor.b, appColor.a or 1)
+                appText:SetShadowOffset(0, 0)
+                appText:SetDrawLayer("OVERLAY", 7)
+                appText:SetJustifyH("CENTER")
+                appText:SetSize(0, 0)
+                appText:ClearAllPoints()
+                if appPosition == "CENTER" then
+                    SetPoint(appText, "CENTER", frame, "CENTER", appOffsetX, appOffsetY)
+                else
+                    SetPoint(appText, "CENTER", bar, appPosition, appOffsetX, appOffsetY)
+                end
+            else
+                if frame.cdmBarAppTextContainer then frame.cdmBarAppTextContainer:Hide() end
+                appText:Hide()
+                appText:SetAlpha(0)
+            end
+        end
+
+        EnsureIconBorder(frame, bar, "cdmBarBorder", styleCache.isBorderActive, borderVersion)
+    end
+
+    frame.cdmLastBarStyleVersion = styleVersion
+    frame.cdmLastBarW = targetFrameWidth
+    frame.cdmLastBarH = targetFrameHeight
+    frame.cdmLastBarOv = spellOv
+
+    frame.cdmBarStyled = true
+
+    if customNameChanged and frame.RefreshName then
+        frame:RefreshName()
+    end
+end
+
+CDM:RegisterRefreshCallback("pandemicCDMStyle", function()
+    CDM:ForEachActiveFrame(CDM_C.ALL_VIEWER_NAMES, function(itemFrame)
+        if itemFrame.cdmPandemicActive then
+            ClearPandemicCDMStyle(itemFrame)
+        end
+
+        if itemFrame.cdmPandemicShown then
+            if itemFrame.PandemicIcon then
+                if styleCache.pandemicGlowEnabled or styleCache.hidePandemicIndicator then
+                    itemFrame.PandemicIcon:Hide()
+                else
+                    itemFrame.PandemicIcon:Show()
+                end
+            end
+            ApplyPandemicCDMStyle(itemFrame)
+        end
+    end)
+end, 30, { "STYLE" })
+
+function CDM:InstallStyleAcquireResetHook(v)
+    hooksecurefunc(v, "OnAcquireItemFrame", function(_, itemFrame)
+        itemFrame.cdmInternalWrite = nil
+        itemFrame.cdmPandemicShown = nil
+        if CDM.Glow then CDM.Glow:HidePandemicGlow(itemFrame) end
+        itemFrame.cdmLastCooldownStyleVer = nil
+        itemFrame.cdmIsProcessingBuffOverride = nil
+        itemFrame.cdmLastAuraActive = nil
+        itemFrame.cdmEquippedItemNativeOverlay = nil
+        itemFrame.cdmEquippedItemNativeRefreshPending = nil
+        itemFrame.cdmRefreshDataVisualPending = nil
+        itemFrame.cdmLastBuffBorderSpellID = nil
+        itemFrame.cdmLastBuffBorderCatID = nil
+        itemFrame.cdmLastBuffBorderColorVer = nil
+        itemFrame.cdmLastBuffBorderStyleVer = nil
+        itemFrame.cdmLastBarOv = nil
+        itemFrame.cdmResolvedShowName = nil
+        itemFrame.cdmResolvedShowDuration = nil
+        itemFrame.cdmResolvedShowApplications = nil
+        itemFrame.cdmResolvedCustomName = nil
+    end)
+end
