@@ -51,7 +51,7 @@ jobs:
               assert token in c, token
 
           assert 'ButtonGlowPool:Release' not in c
-          assert 'pool:Release' not in c
+          assert 'local pool = LCG.ButtonGlowPool' not in c
 
       - name: Build complete addon package
         run: |
