@@ -70,6 +70,10 @@ end
 local function ComputeCooldownReady(frame, spellID)
     local ci = GetSpellCharges(spellID)
     if ci and ci.maxCharges and ci.maxCharges > 1 then
+        local currentCharges = ci.currentCharges
+        if IsSafeNumber(currentCharges) then
+            return currentCharges > 0
+        end
         if not ci.isActive then return true end
         return HasChargeSource(frame)
     end
