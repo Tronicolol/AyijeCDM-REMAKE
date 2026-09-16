@@ -90,7 +90,11 @@ jobs:
               raise SystemExit('native aura helper block not found')
           text = text.replace(old, new, 1)
 
-          old = '''    if isEquippedItem and entry and entry.auraOverlay then
+          function_start = text.index('local function ApplyCooldownWidget(frame, entry, auraActive, sid)')
+          function_end = text.index('\nlocal function ApplyGlows(frame, entry, auraActive)', function_start)
+          block = text[function_start:function_end]
+
+          old_early = '''    if isEquippedItem and entry and entry.auraOverlay then
               if frame.cdmEquippedItemNativeOverlay ~= true then
                   frame.cdmEquippedItemNativeOverlay = true
                   QueueEquippedItemNativeRefresh(frame)
@@ -102,18 +106,9 @@ jobs:
 
           if isEquippedItem then
               frame.cdmEquippedItemNativeOverlay = nil
-          end
+          end'''
 
-          if entry and entry.auraOverlay and auraActive then
-              cd:SetReverse(true)
-              cd:SetAlpha(1)
-              cd:SetDrawEdge(false)
-              cd:SetUseAuraDisplayTime(true)
-              cd:SetDrawSwipe(true)
-              frame.cdmCooldownOverlayStyleApplied = true
-          elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive then'''
-
-          new = '''    if isEquippedItem and entry and entry.auraOverlay then
+          new_early = '''    if isEquippedItem and entry and entry.auraOverlay then
               if frame.cdmEquippedItemNativeOverlay ~= true then
                   frame.cdmEquippedItemNativeOverlay = true
                   QueueEquippedItemNativeRefresh(frame)
@@ -136,20 +131,25 @@ jobs:
               end
           elseif isEquippedItem then
               frame.cdmEquippedItemNativeOverlay = nil
-          end
+          end'''
 
-          if entry and entry.auraOverlay and auraActive and not isEquippedItem then
-              cd:SetReverse(true)
-              cd:SetAlpha(1)
-              cd:SetDrawEdge(false)
-              cd:SetUseAuraDisplayTime(true)
-              cd:SetDrawSwipe(true)
-              frame.cdmCooldownOverlayStyleApplied = true
-          elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive and not isEquippedItem then'''
+          if old_early not in block:
+              raise SystemExit('equipped item early-return block not found')
+          block = block.replace(old_early, new_early, 1)
 
-          if old not in text:
-              raise SystemExit('equipped item overlay branch not found')
-          text = text.replace(old, new, 1)
+          active_old = '    if entry and entry.auraOverlay and auraActive then'
+          active_new = '    if entry and entry.auraOverlay and auraActive and not isEquippedItem then'
+          inactive_old = '    elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive then'
+          inactive_new = '    elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive and not isEquippedItem then'
+
+          if block.count(active_old) != 1:
+              raise SystemExit(f'active overlay branch count: {block.count(active_old)}')
+          if block.count(inactive_old) != 1:
+              raise SystemExit(f'inactive overlay branch count: {block.count(inactive_old)}')
+
+          block = block.replace(active_old, active_new, 1)
+          block = block.replace(inactive_old, inactive_new, 1)
+          text = text[:function_start] + block + text[function_end:]
 
           p.write_text(text, encoding='utf-8')
 
