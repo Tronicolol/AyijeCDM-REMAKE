@@ -242,16 +242,31 @@ end
 
 local function AuraOverlayFallback(info, spellToEntry)
     local match
-    CDM:ForEachSpellMatchCandidate(info.spellID, function(candidate)
-        local entry = spellToEntry[candidate]
-        if not entry then return end
-        if entry.dotDefaultOnly then return end
-        match = entry
-        return true
-    end)
+
+    local function TrySpellID(spellID)
+        if match or not IsSafeNumber(spellID) then return end
+        CDM:ForEachSpellMatchCandidate(spellID, function(candidate)
+            local entry = spellToEntry[candidate]
+            if not entry then return end
+            if entry.dotDefaultOnly then return end
+            match = entry
+            return true
+        end)
+    end
+
+    TrySpellID(info.overrideTooltipSpellID)
+    TrySpellID(info.overrideSpellID)
+    TrySpellID(info.spellID)
+
+    if not match and info.linkedSpellIDs then
+        for _, linkedSpellID in ipairs(info.linkedSpellIDs) do
+            TrySpellID(linkedSpellID)
+            if match then break end
+        end
+    end
+
     return match
 end
-
 local AURA_OVERLAY_MATCH_OPTS = {
     validator = IsSafeNumber,
     isOverrideDot = IsOverrideDot,
