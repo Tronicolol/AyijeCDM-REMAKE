@@ -351,6 +351,12 @@ local function GetCastSpellID(frame)
 end
 CDM.GetCastSpellID = GetCastSpellID
 
+local function IsEquippedItemCooldownFrame(frame)
+    if not frame or type(frame.GetEquipSlot) ~= "function" then return false end
+    local ok, equipSlot = pcall(frame.GetEquipSlot, frame)
+    return ok and IsSafeNumber(equipSlot) and equipSlot > 0
+end
+
 local function HasChargeSource(frame)
     return frame.HasVisualDataSource_Charges and frame:HasVisualDataSource_Charges() or false
 end
@@ -454,6 +460,12 @@ local function ApplyCooldownIconAppearance(frame, entry, auraActive, sid, fallba
     local onCooldown = false
     if entry and entry.auraOverlay then
         onCooldown = false
+    elseif IsEquippedItemCooldownFrame(frame) then
+        local itemCooldownState = fallbackCooldownState
+        if itemCooldownState == nil then itemCooldownState = frame.cooldownDesaturated end
+        if itemCooldownState ~= nil and canaccessvalue(itemCooldownState) then
+            onCooldown = itemCooldownState == true
+        end
     elseif sid then
         local chargeInfo = GetSpellCharges(sid)
         local maxCharges = chargeInfo and chargeInfo.maxCharges
@@ -497,6 +509,12 @@ local function ApplyIconDesat(frame, entry, auraActive, sid, blizzDesat)
         desat = 0
     elseif entry and entry.auraOverlay and entry.auraDesaturateInactive then
         desat = 1
+    elseif IsEquippedItemCooldownFrame(frame) then
+        local boolDesat = blizzDesat
+        if boolDesat == nil then boolDesat = frame.cooldownDesaturated end
+        if boolDesat ~= nil and canaccessvalue(boolDesat) and not styleCache.disableCooldownDesat then
+            desat = EvaluateColorValueFromBoolean(boolDesat, 1, 0)
+        end
     elseif sid and not HasChargeSource(frame) then
         if not styleCache.disableCooldownDesat then
             local realDur = GetSpellCooldownDuration(sid, true)
@@ -556,7 +574,11 @@ local function ApplyCooldownWidget(frame, entry, auraActive, sid)
             cd:SetAlpha(1)
             frame.cdmCooldownOverlayStyleApplied = nil
         end
-        if HasChargeSource(frame) then
+        if IsEquippedItemCooldownFrame(frame) then
+            -- Blizzard has dedicated equipped-item cooldown logic (including
+            -- suppression of shared item/GCD categories). Keep its timer intact.
+            cd:SetDrawEdge(false)
+        elseif HasChargeSource(frame) then
             local chargeDur = sid and GetSpellChargeDuration(sid)
             if chargeDur then
                 cd:SetUseAuraDisplayTime(false)
@@ -1122,7 +1144,7 @@ function CDM:ApplyStyle(frame, vName, forceUpdate)
                     ApplyBaseSwipeStyle(cd, frame)
                     cd:SetDrawEdge(false)
                     cd:SetHideCountdownNumbers(false)
-                    if styleCache.hideGCDSwipe then
+                    if styleCache.hideGCDSwipe and not IsEquippedItemCooldownFrame(frame) then
                         local sid = GetCastSpellID(frame)
                         local realDur = sid and GetSpellCooldownDuration(sid, true)
                         if realDur then
