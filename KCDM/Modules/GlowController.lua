@@ -500,3 +500,7 @@ end
 Glow.RefreshSpellGlowTypeOverrides = function(self)
     for frame in pairs(states) do RefreshFrame(frame, false) end
 end
+
+CDM:RegisterRefreshCallback("unifiedGlowController", function()
+    Glow:RefreshSpellGlowTypeOverrides()
+end, 55, { "STYLE", "CD_DATA" })
