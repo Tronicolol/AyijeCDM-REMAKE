@@ -21,58 +21,41 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
 
           p = Path('KCDM/Core/Style.lua')
           text = p.read_text(encoding='utf-8')
 
-          helper = '''local function QueueEquippedItemNativeRefresh(frame)
-              if not frame or frame.cdmEquippedItemNativeRefreshPending then return end
-              if type(frame.RefreshData) ~= "function" then return end
+          pattern = re.compile(
+              r'\nlocal function QueueEquippedItemNativeRefresh\(frame\)\n.*?\nend\n\nlocal function ApplyPandemicCDMStyle',
+              re.S,
+          )
+          text, count = pattern.subn('\nlocal function ApplyPandemicCDMStyle', text, count=1)
+          if count != 1:
+              raise SystemExit(f'unsafe helper removal count={count}')
 
-              frame.cdmEquippedItemNativeRefreshPending = true
-              C_Timer.After(0, function()
-                  frame.cdmEquippedItemNativeRefreshPending = nil
-                  if not frame.cooldownID then return end
-                  local entry = FindAuraOverlayEntry(frame)
-                  if not entry or entry.auraOverlay ~= true then return end
-                  pcall(frame.RefreshData, frame)
-              end)
-          end
+          pattern = re.compile(
+              r'(\n    if isEquippedItem and entry and entry\.auraOverlay then)\n'
+              r'        if frame\.cdmEquippedItemNativeOverlay ~= true then\n'
+              r'            frame\.cdmEquippedItemNativeOverlay = true\n'
+              r'            QueueEquippedItemNativeRefresh\(frame\)\n'
+              r'        end\n'
+          )
+          text, count = pattern.subn(r'\1\n', text, count=1)
+          if count != 1:
+              raise SystemExit(f'unsafe overlay trigger removal count={count}')
 
-          '''
-          if text.count(helper) != 1:
-              raise SystemExit(f'unsafe helper count={text.count(helper)}')
-          text = text.replace(helper, '', 1)
+          cleanup = '    elseif isEquippedItem then\n        frame.cdmEquippedItemNativeOverlay = nil\n'
+          if text.count(cleanup) != 1:
+              raise SystemExit(f'overlay cleanup count={text.count(cleanup)}')
+          text = text.replace(cleanup, '', 1)
 
-          old = '''    if isEquippedItem and entry and entry.auraOverlay then
-              if frame.cdmEquippedItemNativeOverlay ~= true then
-                  frame.cdmEquippedItemNativeOverlay = true
-                  QueueEquippedItemNativeRefresh(frame)
-              end
-
-              cd:SetHideCountdownNumbers(false)'''
-          new = '''    if isEquippedItem and entry and entry.auraOverlay then
-              cd:SetHideCountdownNumbers(false)'''
-          if text.count(old) != 1:
-              raise SystemExit(f'overlay trigger count={text.count(old)}')
-          text = text.replace(old, new, 1)
-
-          old = '''        end
-              end
-          elseif isEquippedItem then
-              frame.cdmEquippedItemNativeOverlay = nil
-          end
-          if entry and entry.auraOverlay and auraActive and not isEquippedItem then'''
-          new = '''        end
-              end
-          end
-          if entry and entry.auraOverlay and auraActive and not isEquippedItem then'''
-          if text.count(old) != 1:
-              raise SystemExit(f'overlay cleanup branch count={text.count(old)}')
-          text = text.replace(old, new, 1)
-
-          text = text.replace('        itemFrame.cdmEquippedItemNativeOverlay = nil\n', '')
-          text = text.replace('        itemFrame.cdmEquippedItemNativeRefreshPending = nil\n', '')
+          reset_overlay = '        itemFrame.cdmEquippedItemNativeOverlay = nil\n'
+          reset_pending = '        itemFrame.cdmEquippedItemNativeRefreshPending = nil\n'
+          if text.count(reset_overlay) != 1 or text.count(reset_pending) != 1:
+              raise SystemExit('native refresh reset fields not found exactly once')
+          text = text.replace(reset_overlay, '', 1)
+          text = text.replace(reset_pending, '', 1)
 
           p.write_text(text, encoding='utf-8')
 
@@ -99,9 +82,7 @@ jobs:
           assert 'pcall(frame.RefreshData, frame)' not in style
           assert 'cdmEquippedItemNativeOverlay' not in style
           assert 'cdmEquippedItemNativeRefreshPending' not in style
-          # Keep the safe observer hook: Blizzard owns RefreshData; KCDM only reacts after it.
           assert 'hooksecurefunc(frame, "RefreshData", function(self)' in style
-          # Preserve the runtime-only item resolver that fixed aura/glow mapping.
           assert 'return CDM:ResolveAuraOverlayEntryForFrame(frame)' in style
 
           changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
