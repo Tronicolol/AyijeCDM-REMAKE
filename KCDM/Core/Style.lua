@@ -420,9 +420,10 @@ local function GetEquippedItemRealCooldown(frame)
     -- Blizzard gives an active aura precedence over the equipped-item source.
     -- While that aura is active, isOnActualCooldown is false even though the
     -- underlying inventory item cooldown can still be real.
-    local hasLiveAura = GetCachedAuraDuration(frame) ~= nil
+    local auraOwnsVisualState = frame.wasSetFromAura == true
+        or frame.cooldownUseAuraDisplayTime == true
     local actualState = frame.isOnActualCooldown
-    if not hasLiveAura
+    if not auraOwnsVisualState
        and actualState ~= nil
        and canaccessvalue(actualState)
        and actualState ~= true then
@@ -434,7 +435,7 @@ local function GetEquippedItemRealCooldown(frame)
         and type(startTime) == "number" and startTime > 0
         and type(duration) == "number" and duration > CDM_C.ITEM_COOLDOWN_GCD_MIN
 
-    if not hasLiveAura
+    if not auraOwnsVisualState
        and actualState ~= nil
        and canaccessvalue(actualState) then
         active = active and actualState == true
