@@ -364,12 +364,7 @@ local function IsEquippedItemCooldownFrame(frame)
 end
 
 local function IsNativeAuraActive(frame)
-    if not frame then return false end
-    if frame.cooldownUseAuraDisplayTime == true then return true end
-    if type(frame.GetAuraSpellID) ~= "function" then return false end
-
-    local ok, auraSpellID = pcall(frame.GetAuraSpellID, frame)
-    return ok and IsSafeNumber(auraSpellID) and auraSpellID > 0
+    return frame and frame.cooldownUseAuraDisplayTime == true or false
 end
 
 local function GetEquippedItemRealCooldown(frame)
@@ -396,6 +391,35 @@ local function GetEquippedItemRealCooldown(frame)
     end
 
     return active, startTime, duration, enable
+end
+
+local function ApplyNativeAuraCooldown(frame, cd)
+    if not frame or not cd then return false end
+
+    local startTime = frame.cooldownStartTime
+    local duration = frame.cooldownDuration
+    local enabled = frame.cooldownEnabled
+    local modRate = frame.cooldownModRate
+
+    if startTime == nil or duration == nil then return false end
+    if canaccessvalue and (not canaccessvalue(startTime) or not canaccessvalue(duration)) then return false end
+    if enabled ~= nil and canaccessvalue and not canaccessvalue(enabled) then return false end
+    if modRate ~= nil and canaccessvalue and not canaccessvalue(modRate) then return false end
+
+    if type(startTime) ~= "number" or type(duration) ~= "number" or duration <= 0 then
+        return false
+    end
+
+    cd:SetUseAuraDisplayTime(true)
+    cd:SetDrawSwipe(true)
+
+    if type(CooldownFrame_Set) == "function" then
+        CooldownFrame_Set(cd, startTime, duration, enabled, false, modRate or 1)
+    else
+        cd:SetCooldown(startTime, duration, modRate or 1)
+    end
+
+    return true
 end
 
 local function HasChargeSource(frame)
@@ -499,7 +523,7 @@ local function ApplyCooldownIconAppearance(frame, entry, auraActive, sid, fallba
     if not icon then return end
 
     local onCooldown = false
-    if entry and entry.auraOverlay then
+    if entry and entry.auraOverlay and auraActive then
         onCooldown = false
     elseif IsEquippedItemCooldownFrame(frame) then
         onCooldown = GetEquippedItemRealCooldown(frame) == true
@@ -590,11 +614,16 @@ local function ApplyCooldownWidget(frame, entry, auraActive, sid)
     local hideCountdown = false
 
     if entry and entry.auraOverlay and auraActive then
-        cd:SetReverse(true)
         cd:SetAlpha(1)
         cd:SetDrawEdge(false)
-        cd:SetUseAuraDisplayTime(true)
-        cd:SetDrawSwipe(true)
+        if IsEquippedItemCooldownFrame(frame) then
+            cd:SetReverse(false)
+            ApplyNativeAuraCooldown(frame, cd)
+        else
+            cd:SetReverse(true)
+            cd:SetUseAuraDisplayTime(true)
+            cd:SetDrawSwipe(true)
+        end
         frame.cdmCooldownOverlayStyleApplied = true
     elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive then
         cd:SetReverse(false)
