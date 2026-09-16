@@ -460,20 +460,6 @@ local function FindAuraOverlayEntry(frame)
     return nil
 end
 
-local function QueueEquippedItemNativeRefresh(frame)
-    if not frame or frame.cdmEquippedItemNativeRefreshPending then return end
-    if type(frame.RefreshData) ~= "function" then return end
-
-    frame.cdmEquippedItemNativeRefreshPending = true
-    C_Timer.After(0, function()
-        frame.cdmEquippedItemNativeRefreshPending = nil
-        if not frame.cooldownID then return end
-        local entry = FindAuraOverlayEntry(frame)
-        if not entry or entry.auraOverlay ~= true then return end
-        pcall(frame.RefreshData, frame)
-    end)
-end
-
 local function ApplyPandemicCDMStyle(frame)
     if frame.cdmPandemicActive then return end
 
@@ -655,10 +641,6 @@ local function ApplyCooldownWidget(frame, entry, auraActive, sid)
     local hideCountdown = false
 
     if isEquippedItem and entry and entry.auraOverlay then
-        if frame.cdmEquippedItemNativeOverlay ~= true then
-            frame.cdmEquippedItemNativeOverlay = true
-            QueueEquippedItemNativeRefresh(frame)
-        end
 
         cd:SetHideCountdownNumbers(false)
 
@@ -675,8 +657,6 @@ local function ApplyCooldownWidget(frame, entry, auraActive, sid)
                 return
             end
         end
-    elseif isEquippedItem then
-        frame.cdmEquippedItemNativeOverlay = nil
     end
     if entry and entry.auraOverlay and auraActive and not isEquippedItem then
         cd:SetReverse(true)
@@ -1765,8 +1745,6 @@ function CDM:InstallStyleAcquireResetHook(v)
         itemFrame.cdmLastCooldownStyleVer = nil
         itemFrame.cdmIsProcessingBuffOverride = nil
         itemFrame.cdmLastAuraActive = nil
-        itemFrame.cdmEquippedItemNativeOverlay = nil
-        itemFrame.cdmEquippedItemNativeRefreshPending = nil
         itemFrame.cdmRefreshDataVisualPending = nil
         itemFrame.cdmLastBuffBorderSpellID = nil
         itemFrame.cdmLastBuffBorderCatID = nil
