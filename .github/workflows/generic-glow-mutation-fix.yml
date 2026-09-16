@@ -1,0 +1,117 @@
+name: Validate generic glow mutation fix
+
+on:
+  push:
+    branches:
+      - arreglos-visuales
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arreglos-visuales
+          fetch-depth: 0
+
+      - name: Apply generic mutation controller
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('KCDM/Modules/GlowController.lua')
+          text = p.read_text(encoding='utf-8')
+
+          def replace_once(old, new, label):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected 1 match, found {count}')
+              text = text.replace(old, new, 1)
+
+          replace_once(
+              '''local function HardStopButton(host)\n    local f = host and host._ButtonGlow\n    if not f then return end\n    if f.animIn and f.animIn:IsPlaying() then f.animIn:Stop() end\n    if f.animOut and f.animOut:IsPlaying() then f.animOut:Stop() end\n    local pool = LCG.ButtonGlowPool\n    if pool and pool.Release then\n        pool:Release(f)\n    else\n        LCG.ButtonGlow_Stop(host)\n    end\nend\n\nlocal function HardStopHost(host)\n    if not host then return end\n    host:Hide()\n    LCG.PixelGlow_Stop(host, GLOW_KEY)\n    LCG.AutoCastGlow_Stop(host, GLOW_KEY)\n    HardStopButton(host)\n    StopProcAnimations(host)\n    LCG.ProcGlow_Stop(host, GLOW_KEY)\n''',
+              '''local function HardStopButton(host)\n    if not host or not host._ButtonGlow then return end\n    -- LibCustomGlow owns the ButtonGlow pool lifecycle. Calling Release()\n    -- directly races its animOut/OnHide resetter and can double-release an\n    -- object that has already returned to the pool. Always use its public stop.\n    LCG.ButtonGlow_Stop(host)\nend\n\nlocal function HardStopHost(host)\n    if not host then return end\n    LCG.PixelGlow_Stop(host, GLOW_KEY)\n    LCG.AutoCastGlow_Stop(host, GLOW_KEY)\n    HardStopButton(host)\n    StopProcAnimations(host)\n    LCG.ProcGlow_Stop(host, GLOW_KEY)\n    -- Hiding after ButtonGlow_Stop makes an active fade release immediately\n    -- through LibCustomGlow's own OnHide handler, without bypassing the pool.\n    host:Hide()\n''',
+              'safe button glow stop'
+          )
+
+          replace_once(
+              '''local specTransitionSuspended = false\nlocal specTransitionGeneration = 0\nlocal resetSnapshot = {}\n''',
+              '''local mutationSuspended = false\nlocal mutationGeneration = 0\nlocal specTransitionActive = false\nlocal resetSnapshot = {}\nlocal MUTATION_QUIET_DELAY = 0.12\n''',
+              'generic mutation state'
+          )
+
+          old_block = '''function Glow:BeginSpecTransition()\n    specTransitionGeneration = specTransitionGeneration + 1\n    specTransitionSuspended = true\n    ResetAllPrimaryGlows()\nend\n\nfunction Glow:EndSpecTransition()\n    if not specTransitionSuspended then return end\n\n    -- Blizzard recycles/reparents cooldown frames while specialization data is\n    -- rebuilding. Purge again before re-enabling requests so no transient host\n    -- geometry survives into the settled specialization.\n    ResetAllPrimaryGlows()\n\n    local generation = specTransitionGeneration\n    C_Timer.After(0, function()\n        if not specTransitionSuspended then return end\n        if specTransitionGeneration ~= generation then return end\n\n        specTransitionSuspended = false\n        if CDM.Refresh then\n            CDM:Refresh()\n        elseif CDM.GlowDirector and CDM.GlowDirector.RebuildIndex then\n            CDM.GlowDirector:RebuildIndex()\n        end\n    end)\nend\n'''
+          new_block = '''local function RebuildGlowStateAfterMutation()\n    local director = CDM.GlowDirector\n    if director and director.RebuildIndex then\n        director:RebuildIndex()\n        return\n    end\n\n    if CDM.ForEachActiveFrame and CDM.RefreshFrameVisuals then\n        CDM:ForEachActiveFrame({ VIEWERS.ESSENTIAL, VIEWERS.UTILITY }, function(frame)\n            CDM:RefreshFrameVisuals(frame)\n        end)\n    end\nend\n\nlocal function ScheduleMutationResume(generation)\n    C_Timer.After(MUTATION_QUIET_DELAY, function()\n        if specTransitionActive then return end\n        if not mutationSuspended then return end\n        if mutationGeneration ~= generation then return end\n\n        -- Purge once more after Blizzard has finished its last layout mutation,\n        -- then rebuild only glow state. Do not call CDM:Refresh(), because that\n        -- can itself trigger another CooldownViewer layout/reacquire cycle.\n        ResetAllPrimaryGlows()\n        mutationSuspended = false\n        RebuildGlowStateAfterMutation()\n    end)\nend\n\nfunction Glow:NotifyViewerMutation()\n    mutationGeneration = mutationGeneration + 1\n    mutationSuspended = true\n    ResetAllPrimaryGlows()\n    ScheduleMutationResume(mutationGeneration)\nend\n\nfunction Glow:BeginSpecTransition()\n    specTransitionActive = true\n    mutationGeneration = mutationGeneration + 1\n    mutationSuspended = true\n    ResetAllPrimaryGlows()\nend\n\nfunction Glow:EndSpecTransition()\n    if not mutationSuspended then return end\n    specTransitionActive = false\n    mutationGeneration = mutationGeneration + 1\n    ResetAllPrimaryGlows()\n    ScheduleMutationResume(mutationGeneration)\nend\n'''
+          replace_once(old_block, new_block, 'generic mutation lifecycle')
+
+          text = text.replace('if specTransitionSuspended then', 'if mutationSuspended then')
+          if 'specTransitionSuspended' in text:
+              raise SystemExit('stale specTransitionSuspended reference')
+
+          replace_once(
+              '''Glow.InstallAcquireResetHook = function(self, viewer)\n    hooksecurefunc(viewer, "OnAcquireItemFrame", function(_, itemFrame)\n        local state = states[itemFrame]\n        if mutationSuspended then\n''',
+              '''Glow.InstallAcquireResetHook = function(self, viewer)\n    hooksecurefunc(viewer, "OnAcquireItemFrame", function(_, itemFrame)\n        -- OnAcquireItemFrame is Blizzard's structural signal that a CooldownViewer\n        -- frame is being rebuilt/recycled. Treat every acquire as a generic CDM\n        -- mutation so glows never render against transient geometry.\n        Glow:NotifyViewerMutation()\n\n        local state = states[itemFrame]\n        if mutationSuspended then\n''',
+              'acquire starts generic mutation'
+          )
+
+          p.write_text(text, encoding='utf-8')
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate complete addon
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check
+
+      - name: Validate XML and invariants
+        shell: python
+        run: |
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+
+          c = Path('KCDM/Modules/GlowController.lua').read_text(encoding='utf-8')
+          required = [
+              'function Glow:NotifyViewerMutation()',
+              'local MUTATION_QUIET_DELAY = 0.12',
+              'Glow:NotifyViewerMutation()',
+              'RebuildGlowStateAfterMutation()',
+              'LCG.ButtonGlow_Stop(host)',
+              'mutationSuspended',
+          ]
+          for token in required:
+              assert token in c, token
+          assert 'ButtonGlowPool:Release' not in c
+          assert 'pool:Release' not in c
+          assert 'CDM:Refresh()' not in c
+
+      - name: Commit bugfix
+        run: |
+          git config user.name 'Tronicolol'
+          git config user.email '54152736+Tronicolol@users.noreply.github.com'
+          git add KCDM/Modules/GlowController.lua
+          git commit -m 'Make glow suspension generic across CDM mutations [skip ci]'
+          git push origin HEAD:arreglos-visuales
+
+      - name: Build complete addon package
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+          cp -a KCDM_Options package/KCDM_Options
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ayije-Complete-Generic-Glow-Fix
+          path: package/
+          if-no-files-found: error
