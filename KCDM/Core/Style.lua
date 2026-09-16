@@ -20,6 +20,7 @@ local GetSpellCooldown = C_Spell.GetSpellCooldown
 local GetSpellCooldownDuration = C_Spell.GetSpellCooldownDuration
 local GetSpellChargeDuration = C_Spell.GetSpellChargeDuration
 local GetSpellCharges = C_Spell.GetSpellCharges
+local GetInventoryItemCooldown = GetInventoryItemCooldown
 local TruncateWhenZero = C_StringUtil.TruncateWhenZero
 local GetConfigValue = CDM_C.GetConfigValue
 local DesaturationCurve = CDM_C.DesaturationCurve
@@ -351,10 +352,41 @@ local function GetCastSpellID(frame)
 end
 CDM.GetCastSpellID = GetCastSpellID
 
-local function IsEquippedItemCooldownFrame(frame)
-    if not frame or type(frame.GetEquipSlot) ~= "function" then return false end
+local function GetEquippedItemSlot(frame)
+    if not frame or type(frame.GetEquipSlot) ~= "function" then return nil end
     local ok, equipSlot = pcall(frame.GetEquipSlot, frame)
-    return ok and IsSafeNumber(equipSlot) and equipSlot > 0
+    if not ok or not IsSafeNumber(equipSlot) or equipSlot <= 0 then return nil end
+    return equipSlot
+end
+
+local function IsEquippedItemCooldownFrame(frame)
+    return GetEquippedItemSlot(frame) ~= nil
+end
+
+local function GetEquippedItemRealCooldown(frame)
+    local equipSlot = GetEquippedItemSlot(frame)
+    if not equipSlot or not GetInventoryItemCooldown then
+        return false, nil, nil, nil
+    end
+
+    -- Blizzard has already filtered shared trinket/GCD categories when it sets
+    -- isOnActualCooldown. Reuse that decision so an unused trinket never shows
+    -- the shared lockout as its own cooldown.
+    local actualState = frame.isOnActualCooldown
+    if actualState ~= nil and canaccessvalue(actualState) and actualState ~= true then
+        return false, nil, nil, nil
+    end
+
+    local startTime, duration, enable = GetInventoryItemCooldown("player", equipSlot)
+    local active = enable == 1
+        and type(startTime) == "number" and startTime > 0
+        and type(duration) == "number" and duration > CDM_C.ITEM_COOLDOWN_GCD_MIN
+
+    if actualState ~= nil and canaccessvalue(actualState) then
+        active = active and actualState == true
+    end
+
+    return active, startTime, duration, enable
 end
 
 local function HasChargeSource(frame)
@@ -461,11 +493,7 @@ local function ApplyCooldownIconAppearance(frame, entry, auraActive, sid, fallba
     if entry and entry.auraOverlay then
         onCooldown = false
     elseif IsEquippedItemCooldownFrame(frame) then
-        local itemCooldownState = fallbackCooldownState
-        if itemCooldownState == nil then itemCooldownState = frame.cooldownDesaturated end
-        if itemCooldownState ~= nil and canaccessvalue(itemCooldownState) then
-            onCooldown = itemCooldownState == true
-        end
+        onCooldown = GetEquippedItemRealCooldown(frame) == true
     elseif sid then
         local chargeInfo = GetSpellCharges(sid)
         local maxCharges = chargeInfo and chargeInfo.maxCharges
@@ -510,10 +538,8 @@ local function ApplyIconDesat(frame, entry, auraActive, sid, blizzDesat)
     elseif entry and entry.auraOverlay and entry.auraDesaturateInactive then
         desat = 1
     elseif IsEquippedItemCooldownFrame(frame) then
-        local boolDesat = blizzDesat
-        if boolDesat == nil then boolDesat = frame.cooldownDesaturated end
-        if boolDesat ~= nil and canaccessvalue(boolDesat) and not styleCache.disableCooldownDesat then
-            desat = EvaluateColorValueFromBoolean(boolDesat, 1, 0)
+        if not styleCache.disableCooldownDesat and GetEquippedItemRealCooldown(frame) == true then
+            desat = 1
         end
     elseif sid and not HasChargeSource(frame) then
         if not styleCache.disableCooldownDesat then
@@ -575,9 +601,22 @@ local function ApplyCooldownWidget(frame, entry, auraActive, sid)
             frame.cdmCooldownOverlayStyleApplied = nil
         end
         if IsEquippedItemCooldownFrame(frame) then
-            -- Blizzard has dedicated equipped-item cooldown logic (including
-            -- suppression of shared item/GCD categories). Keep its timer intact.
+            -- Show Overlay is the only setting allowed to expose Blizzard's aura
+            -- timer. Without it, always render the equipped item's real cooldown.
+            cd:SetReverse(false)
+            cd:SetUseAuraDisplayTime(false)
             cd:SetDrawEdge(false)
+            local active, startTime, duration = GetEquippedItemRealCooldown(frame)
+            if active then
+                if not frame.cdmEquippedItemDurationObj then
+                    frame.cdmEquippedItemDurationObj = C_DurationUtil.CreateDuration()
+                end
+                frame.cdmEquippedItemDurationObj:SetTimeFromStart(startTime, duration)
+                cd:SetCooldownFromDurationObject(frame.cdmEquippedItemDurationObj)
+                cd:SetDrawSwipe(true)
+            else
+                cd:Clear()
+            end
         elseif HasChargeSource(frame) then
             local chargeDur = sid and GetSpellChargeDuration(sid)
             if chargeDur then
@@ -634,7 +673,8 @@ function CDM:RefreshFrameVisuals(frame, skipDesat)
     if not frame then return end
     if not VIEWERS_WITH_OVERRIDE[frame.cdmViewerName] then return end
     local entry = FindAuraOverlayEntry(frame)
-    local auraActive = (frame.cooldownUseAuraDisplayTime == true)
+    local blizzardAuraActive = (frame.cooldownUseAuraDisplayTime == true)
+    local auraActive = entry and entry.auraOverlay == true and blizzardAuraActive or false
     local sid = GetCastSpellID(frame)
     frame.cdmLastAuraActive = auraActive
     if not skipDesat then
