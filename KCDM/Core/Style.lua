@@ -363,10 +363,54 @@ local function IsEquippedItemCooldownFrame(frame)
     return GetEquippedItemSlot(frame) ~= nil
 end
 
-local function IsNativeAuraActive(frame)
-    return frame and frame.cooldownUseAuraDisplayTime == true or false
+local function GetCachedAuraData(frame)
+    if not frame or type(frame.GetAuraDataCached) ~= "function" then return nil end
+    local ok, auraData = pcall(frame.GetAuraDataCached, frame)
+    if not ok or type(auraData) ~= "table" then return nil end
+    return auraData
 end
 
+local function GetCachedAuraDuration(frame)
+    local auraData = GetCachedAuraData(frame)
+    if not auraData or not C_UnitAuras or type(C_UnitAuras.GetAuraDuration) ~= "function" then return nil end
+
+    local auraInstanceID = auraData.auraInstanceID
+    if not auraInstanceID then return nil end
+
+    local auraUnit = "player"
+    if type(frame.GetAuraDataUnit) == "function" then
+        local ok, unit = pcall(frame.GetAuraDataUnit, frame)
+        if ok and type(unit) == "string" and unit ~= "" then
+            auraUnit = unit
+        end
+    end
+
+    local ok, durationObject = pcall(C_UnitAuras.GetAuraDuration, auraUnit, auraInstanceID)
+    if not ok then return nil end
+    return durationObject
+end
+
+local function IsNativeAuraActive(frame)
+    if not frame then return false end
+    if GetCachedAuraDuration(frame) then return true end
+    if frame.wasSetFromAura == true then return true end
+    return frame.cooldownUseAuraDisplayTime == true or false
+end
+
+local function ApplyEquippedItemAuraCooldown(frame, cd)
+    if not frame or not cd then return false end
+
+    local durationObject = GetCachedAuraDuration(frame)
+    if not durationObject then return false end
+
+    cd:SetReverse(true)
+    cd:SetAlpha(1)
+    cd:SetDrawEdge(false)
+    cd:SetUseAuraDisplayTime(true)
+    cd:SetDrawSwipe(true)
+    cd:SetCooldownFromDurationObject(durationObject)
+    return true
+end
 local function GetEquippedItemRealCooldown(frame)
     local equipSlot = GetEquippedItemSlot(frame)
     if not equipSlot or not GetInventoryItemCooldown then
@@ -604,23 +648,33 @@ local function ApplyCooldownWidget(frame, entry, auraActive, sid)
             frame.cdmEquippedItemNativeOverlay = true
             QueueEquippedItemNativeRefresh(frame)
         end
-        cd:SetHideCountdownNumbers(false)
-        frame.cdmInternalWrite = false
-        return
-    end
 
-    if isEquippedItem then
+        cd:SetHideCountdownNumbers(false)
+
+        if auraActive then
+            if ApplyEquippedItemAuraCooldown(frame, cd) then
+                frame.cdmCooldownOverlayStyleApplied = true
+                frame.cdmInternalWrite = false
+                return
+            end
+
+            if frame.wasSetFromAura == true or frame.cooldownUseAuraDisplayTime == true then
+                frame.cdmCooldownOverlayStyleApplied = true
+                frame.cdmInternalWrite = false
+                return
+            end
+        end
+    elseif isEquippedItem then
         frame.cdmEquippedItemNativeOverlay = nil
     end
-
-    if entry and entry.auraOverlay and auraActive then
+    if entry and entry.auraOverlay and auraActive and not isEquippedItem then
         cd:SetReverse(true)
         cd:SetAlpha(1)
         cd:SetDrawEdge(false)
         cd:SetUseAuraDisplayTime(true)
         cd:SetDrawSwipe(true)
         frame.cdmCooldownOverlayStyleApplied = true
-    elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive then
+    elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive and not isEquippedItem then
         cd:SetReverse(false)
         cd:SetAlpha(1)
         cd:SetDrawEdge(false)
