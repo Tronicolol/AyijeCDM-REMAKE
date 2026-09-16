@@ -1,0 +1,79 @@
+name: Diagnose trinket aura glow
+
+on:
+  push:
+    branches:
+      - fix-trinket-aura-overlay-glow
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-trinket-aura-overlay-glow
+          fetch-depth: 0
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate diagnostic addon
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check main...HEAD
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import xml.etree.ElementTree as ET
+
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only', 'main...HEAD'], text=True).splitlines())
+          expected = {
+              '.github/workflows/diagnose-trinket-aura-glow.yml',
+              'KCDM/Core/TrinketAuraDebug.lua',
+              'KCDM/Core/embeds.xml',
+          }
+          assert changed == expected, (changed, expected)
+
+          embeds = Path('KCDM/Core/embeds.xml').read_text(encoding='utf-8')
+          assert '<Script file="TrinketAuraDebug.lua"/>' in embeds
+
+          diag = Path('KCDM/Core/TrinketAuraDebug.lua').read_text(encoding='utf-8')
+          assert '/kcdmauradiag' in diag
+          assert 'GetInventoryItemCooldown' in diag
+          assert '_auraOverlayEnabled' in diag
+          assert 'wasSetFromAura' in diag
+          assert 'cooldownUseAuraDisplayTime' in diag
+          assert 'cdmGlowProducer' in diag
+          assert 'GetUnitAuraDuration' in diag
+          PY
+
+      - name: Build complete addon package
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+          cp -a KCDM_Options package/KCDM_Options
+
+      - name: Verify package roots
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          roots = sorted(p.name for p in Path('package').iterdir())
+          assert roots == ['KCDM', 'KCDM_Options'], roots
+          assert Path('package/KCDM/KCDM.toc').is_file()
+          assert Path('package/KCDM_Options/KCDM_Options.toc').is_file()
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KCDM-Trinket-Aura-Glow-Diagnostic
+          path: package/
+          if-no-files-found: error
