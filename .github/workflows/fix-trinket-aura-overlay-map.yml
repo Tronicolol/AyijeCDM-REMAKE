@@ -1,0 +1,159 @@
+name: Fix trinket aura overlay map
+
+on:
+  push:
+    branches:
+      - fix-trinket-aura-overlay-glow
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-trinket-aura-overlay-glow
+          fetch-depth: 0
+
+      - name: Apply focused aura-map fix and remove diagnostic
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('KCDM/Modules/CooldownGroups.lua')
+          text = p.read_text(encoding='utf-8')
+
+          old = '''local function AuraOverlayFallback(info, spellToEntry)
+    local match
+    CDM:ForEachSpellMatchCandidate(info.spellID, function(candidate)
+        local entry = spellToEntry[candidate]
+        if not entry then return end
+        if entry.dotDefaultOnly then return end
+        match = entry
+        return true
+    end)
+    return match
+end'''
+
+          new = '''local function AuraOverlayFallback(info, spellToEntry)
+    local match
+
+    local function TrySpellID(spellID)
+        if match or not IsSafeNumber(spellID) then return end
+        CDM:ForEachSpellMatchCandidate(spellID, function(candidate)
+            local entry = spellToEntry[candidate]
+            if not entry then return end
+            if entry.dotDefaultOnly then return end
+            match = entry
+            return true
+        end)
+    end
+
+    TrySpellID(info.overrideTooltipSpellID)
+    TrySpellID(info.overrideSpellID)
+    TrySpellID(info.spellID)
+
+    if not match and info.linkedSpellIDs then
+        for _, linkedSpellID in ipairs(info.linkedSpellIDs) do
+            TrySpellID(linkedSpellID)
+            if match then break end
+        end
+    end
+
+    return match
+end'''
+
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one AuraOverlayFallback target, found {text.count(old)}')
+
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          embeds = Path('KCDM/Core/embeds.xml')
+          embeds_text = embeds.read_text(encoding='utf-8')
+          diag_line = '    <Script file="TrinketAuraDebug.lua"/>\n'
+          if embeds_text.count(diag_line) != 1:
+              raise SystemExit(f'expected one diagnostic embed line, found {embeds_text.count(diag_line)}')
+          embeds.write_text(embeds_text.replace(diag_line, '', 1), encoding='utf-8')
+
+          diag = Path('KCDM/Core/TrinketAuraDebug.lua')
+          if not diag.is_file():
+              raise SystemExit('diagnostic file missing before cleanup')
+          diag.unlink()
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate Lua XML diff and invariants
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import xml.etree.ElementTree as ET
+
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          expected = {
+              'KCDM/Modules/CooldownGroups.lua',
+              'KCDM/Core/embeds.xml',
+              'KCDM/Core/TrinketAuraDebug.lua',
+          }
+          assert changed == expected, (changed, expected)
+
+          # The known-good cooldown/rendering path must remain untouched.
+          subprocess.check_call(['git', 'diff', '--exit-code', 'origin/main', '--', 'KCDM/Core/Style.lua'])
+          subprocess.check_call(['git', 'diff', '--exit-code', 'origin/main', '--', 'KCDM/Core/Glow.lua'])
+
+          s = Path('KCDM/Modules/CooldownGroups.lua').read_text(encoding='utf-8')
+          start = s.index('local function AuraOverlayFallback')
+          end = s.index('\nlocal AURA_OVERLAY_MATCH_OPTS', start)
+          helper = s[start:end]
+          assert 'TrySpellID(info.overrideTooltipSpellID)' in helper
+          assert 'TrySpellID(info.overrideSpellID)' in helper
+          assert 'TrySpellID(info.spellID)' in helper
+          assert 'for _, linkedSpellID in ipairs(info.linkedSpellIDs)' in helper
+          assert 'entry.dotDefaultOnly' in helper
+          assert 'CDM:ForEachSpellMatchCandidate(spellID' in helper
+
+          embeds = Path('KCDM/Core/embeds.xml').read_text(encoding='utf-8')
+          assert 'TrinketAuraDebug.lua' not in embeds
+          assert not Path('KCDM/Core/TrinketAuraDebug.lua').exists()
+          PY
+
+      - name: Commit focused fix
+        run: |
+          git config user.name 'Tronicolol'
+          git config user.email '54152736+Tronicolol@users.noreply.github.com'
+          git add KCDM/Modules/CooldownGroups.lua KCDM/Core/embeds.xml KCDM/Core/TrinketAuraDebug.lua
+          git commit -m 'Match aura overlay overrides across cooldown spell variants [skip ci]'
+          git push origin HEAD:fix-trinket-aura-overlay-glow
+
+      - name: Build complete addon package
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+          cp -a KCDM_Options package/KCDM_Options
+
+      - name: Verify complete package roots
+        shell: python
+        run: |
+          from pathlib import Path
+          roots = sorted(p.name for p in Path('package').iterdir())
+          assert roots == ['KCDM', 'KCDM_Options'], roots
+          assert Path('package/KCDM/KCDM.toc').is_file()
+          assert Path('package/KCDM_Options/KCDM_Options.toc').is_file()
+          assert not Path('package/KCDM/Core/TrinketAuraDebug.lua').exists()
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KCDM-Trinket-Aura-Overlay-Glow-Fix
+          path: package/
+          if-no-files-found: error
