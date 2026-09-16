@@ -1,0 +1,138 @@
+name: Fix trinket off cooldown state
+
+on:
+  push:
+    branches:
+      - arreglos-visuales
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arreglos-visuales
+          fetch-depth: 0
+
+      - name: Apply minimal cooldown-state fix
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('KCDM/Core/Style.lua')
+          text = p.read_text(encoding='utf-8')
+
+          old = '''local function GetEquippedItemRealCooldown(frame)
+              local equipSlot = GetEquippedItemSlot(frame)
+              if not equipSlot or not GetInventoryItemCooldown then
+                  return false, nil, nil, nil
+              end
+
+              -- Blizzard has already filtered shared trinket/GCD categories when it sets
+              -- isOnActualCooldown. Reuse that decision so an unused trinket never shows
+              -- the shared lockout as its own cooldown.
+              local actualState = frame.isOnActualCooldown
+              if actualState ~= nil and canaccessvalue(actualState) and actualState ~= true then
+                  return false, nil, nil, nil
+              end
+
+              local startTime, duration, enable = GetInventoryItemCooldown("player", equipSlot)
+              local active = enable == 1
+                  and type(startTime) == "number" and startTime > 0
+                  and type(duration) == "number" and duration > CDM_C.ITEM_COOLDOWN_GCD_MIN
+
+              if actualState ~= nil and canaccessvalue(actualState) then
+                  active = active and actualState == true
+              end
+
+              return active, startTime, duration, enable
+          end'''
+
+          new = '''local function GetEquippedItemRealCooldown(frame)
+              local equipSlot = GetEquippedItemSlot(frame)
+              if not equipSlot or not GetInventoryItemCooldown then
+                  return false, nil, nil, nil
+              end
+
+              -- Blizzard gives an active aura precedence over the equipped-item source.
+              -- While that aura is active, isOnActualCooldown is false even though the
+              -- underlying inventory item cooldown can still be real.
+              local hasLiveAura = GetCachedAuraDuration(frame) ~= nil
+              local actualState = frame.isOnActualCooldown
+              if not hasLiveAura
+                 and actualState ~= nil
+                 and canaccessvalue(actualState)
+                 and actualState ~= true then
+                  return false, nil, nil, nil
+              end
+
+              local startTime, duration, enable = GetInventoryItemCooldown("player", equipSlot)
+              local active = enable == 1
+                  and type(startTime) == "number" and startTime > 0
+                  and type(duration) == "number" and duration > CDM_C.ITEM_COOLDOWN_GCD_MIN
+
+              if not hasLiveAura
+                 and actualState ~= nil
+                 and canaccessvalue(actualState) then
+                  active = active and actualState == true
+              end
+
+              return active, startTime, duration, enable
+          end'''
+
+          if text.count(old) != 1:
+              raise SystemExit(f'expected exactly one current helper, found {text.count(old)}')
+
+          text = text.replace(old, new, 1)
+          p.write_text(text, encoding='utf-8')
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate Lua, XML and invariants
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check
+          python - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+
+          s = Path('KCDM/Core/Style.lua').read_text(encoding='utf-8')
+          assert s.count('local hasLiveAura = GetCachedAuraDuration(frame) ~= nil') == 1
+          helper = s[s.index('local function GetEquippedItemRealCooldown(frame)'):s.index('\nlocal function HasChargeSource(frame)')]
+          assert helper.count('if not hasLiveAura') == 2
+          assert 'C_UnitAuras.GetUnitAuraDuration' in s
+          assert 'C_UnitAuras.GetAuraDuration' not in s
+          assert 'if isEquippedItem and entry and entry.auraOverlay then' in s
+          assert 'if ApplyEquippedItemAuraCooldown(frame, cd) then' in s
+          PY
+
+      - name: Commit fix
+        run: |
+          git config user.name 'Tronicolol'
+          git config user.email '54152736+Tronicolol@users.noreply.github.com'
+          git add KCDM/Core/Style.lua
+          git commit -m 'Preserve real trinket cooldown while aura is active [skip ci]'
+          git push origin HEAD:arreglos-visuales
+
+      - name: Build complete addon package
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+          cp -a KCDM_Options package/KCDM_Options
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KCDM-Trinket-Off-Cooldown-Fix
+          path: package/
+          if-no-files-found: error
