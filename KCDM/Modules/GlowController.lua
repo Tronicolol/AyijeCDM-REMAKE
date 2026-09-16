@@ -22,7 +22,10 @@ local originalRefreshActiveGlows = Glow.RefreshActiveGlows
 local lastVisualConfigVersion = Glow.visualConfigVersion or 0
 local specTransitionSuspended = false
 local specTransitionGeneration = 0
+local layoutMutationSuspended = false
+local layoutMutationGeneration = 0
 local resetSnapshot = {}
+local LAYOUT_SETTLE_DELAY = 0.12
 
 local procOpts = {
     color = nil,
@@ -111,26 +114,25 @@ local function StopProcAnimations(host)
 end
 
 local function HardStopButton(host)
-    local f = host and host._ButtonGlow
-    if not f then return end
-    if f.animIn and f.animIn:IsPlaying() then f.animIn:Stop() end
-    if f.animOut and f.animOut:IsPlaying() then f.animOut:Stop() end
-    local pool = LCG.ButtonGlowPool
-    if pool and pool.Release then
-        pool:Release(f)
-    else
-        LCG.ButtonGlow_Stop(host)
-    end
+    if not host or not host._ButtonGlow then return end
+
+    -- LibCustomGlow owns the ButtonGlow pool. Calling pool:Release() here can
+    -- race its own OnHide/animation cleanup and double-release the same frame.
+    -- Use only the public stop API and let the library return the object.
+    LCG.ButtonGlow_Stop(host)
 end
 
 local function HardStopHost(host)
     if not host then return end
-    host:Hide()
+
+    -- Stop library-owned objects before hiding their parent. In particular,
+    -- ButtonGlow has an OnHide cleanup path that may release its pooled frame.
     LCG.PixelGlow_Stop(host, GLOW_KEY)
     LCG.AutoCastGlow_Stop(host, GLOW_KEY)
     HardStopButton(host)
     StopProcAnimations(host)
     LCG.ProcGlow_Stop(host, GLOW_KEY)
+    host:Hide()
     host.cdmGlowActive = nil
     host.cdmGlowType = nil
     host.cdmGlowOverrideType = nil
@@ -337,6 +339,8 @@ local function SelectWinner(frame, state)
     end
 end
 
+local RefreshFrame
+
 local function ClearCompat(frame)
     frame.cdmGlowProducer = nil
     frame.cdmBuffGlowWanted = nil
@@ -377,6 +381,79 @@ local function ResetAllPrimaryGlows()
     end
 end
 
+local function StopAllPrimaryVisuals()
+    local seen = setmetatable({}, { __mode = "k" })
+
+    for frame in pairs(states) do
+        seen[frame] = true
+        local host = frame.cdmBuffGlowHost
+        if host then
+            HardStopHost(host)
+        end
+    end
+
+    if CDM.ForEachActiveFrame then
+        CDM:ForEachActiveFrame({ VIEWERS.ESSENTIAL, VIEWERS.UTILITY }, function(frame)
+            if seen[frame] then return end
+            local host = frame.cdmBuffGlowHost
+            if host then
+                HardStopHost(host)
+            end
+        end)
+    end
+end
+
+local function IsPrimaryGlowSuspended()
+    return specTransitionSuspended or layoutMutationSuspended
+end
+
+local function FinishLayoutMutation(generation)
+    if not layoutMutationSuspended then return end
+    if layoutMutationGeneration ~= generation then return end
+    if specTransitionSuspended then return end
+
+    -- Reapply our own layout while rendering is still suspended. This restores
+    -- grouped/buff glow requests without exposing LibCustomGlow to intermediate
+    -- frame geometry. ForceReanchorAll does not ask Blizzard to RefreshLayout.
+    if CDM.ForceReanchorAll then
+        CDM:ForceReanchorAll()
+    end
+
+    -- A nested acquire wins and starts a new settle window.
+    if layoutMutationGeneration ~= generation then return end
+    if specTransitionSuspended then return end
+
+    layoutMutationSuspended = false
+
+    -- Rebuild only glow state. Do not call CDM:Refresh() here: that can trigger
+    -- another CooldownViewer layout rebuild and create a suspend/refresh loop.
+    if CDM.GlowDirector and CDM.GlowDirector.RebuildIndex then
+        CDM.GlowDirector:RebuildIndex()
+    end
+
+    for frame in pairs(states) do
+        RefreshFrame(frame, false)
+    end
+end
+
+local function ScheduleLayoutMutationFinish()
+    local generation = layoutMutationGeneration
+    C_Timer.After(LAYOUT_SETTLE_DELAY, function()
+        FinishLayoutMutation(generation)
+    end)
+end
+
+local function BeginLayoutMutation()
+    layoutMutationGeneration = layoutMutationGeneration + 1
+
+    if not layoutMutationSuspended then
+        layoutMutationSuspended = true
+        StopAllPrimaryVisuals()
+    end
+
+    ScheduleLayoutMutationFinish()
+end
+
 function Glow:BeginSpecTransition()
     specTransitionGeneration = specTransitionGeneration + 1
     specTransitionSuspended = true
@@ -397,6 +474,11 @@ function Glow:EndSpecTransition()
         if specTransitionGeneration ~= generation then return end
 
         specTransitionSuspended = false
+        if layoutMutationSuspended then
+            layoutMutationGeneration = layoutMutationGeneration + 1
+            ScheduleLayoutMutationFinish()
+        end
+
         if CDM.Refresh then
             CDM:Refresh()
         elseif CDM.GlowDirector and CDM.GlowDirector.RebuildIndex then
@@ -445,8 +527,6 @@ local function ApplyVisual(frame, request, forceUpdate)
     host:SetShown(frame:IsShown())
 end
 
-local RefreshFrame
-
 local function EnsureFrameHooks(frame)
     if hookedFrames[frame] then return end
     hookedFrames[frame] = true
@@ -490,6 +570,15 @@ RefreshFrame = function(frame, forceUpdate)
     frame.cdmBuffGlowOverrideColor = request.overrideColor
     frame.cdmBuffGlowSourceID = request.sourceID
     EnsureFrameHooks(frame)
+
+    if IsPrimaryGlowSuspended() then
+        local host = frame.cdmBuffGlowHost
+        if host then
+            HardStopHost(host)
+        end
+        return
+    end
+
     ApplyVisual(frame, request, forceUpdate == true)
 end
 
@@ -529,39 +618,40 @@ end
 
 Glow.InstallAcquireResetHook = function(self, viewer)
     hooksecurefunc(viewer, "OnAcquireItemFrame", function(_, itemFrame)
+        -- Any CooldownViewer acquire means Blizzard is rebuilding layout or
+        -- identity. Suspend all primary glow rendering until acquires go quiet.
+        BeginLayoutMutation()
+
         local state = states[itemFrame]
-        if specTransitionSuspended then
-            if state then
-                ResetPrimary(itemFrame)
-            else
-                ClearCompat(itemFrame)
-                local host = itemFrame.cdmBuffGlowHost
-                if host then HardStopHost(host) end
-            end
-            return
-        end
         if not state then
             ClearCompat(itemFrame)
             local host = itemFrame.cdmBuffGlowHost
-            if host then HardStopHost(host) end
-            return
-        end
-        state.acquireGeneration = state.acquireGeneration + 1
-        local generation = state.acquireGeneration
-        local oldCooldownID = state.boundCooldownID
-        C_Timer.After(0, function()
-            if states[itemFrame] ~= state or state.acquireGeneration ~= generation then return end
-            if oldCooldownID ~= nil and itemFrame.cooldownID ~= oldCooldownID then
-                ResetPrimary(itemFrame)
-                return
+            if host then
+                HardStopHost(host)
             end
-            RefreshFrame(itemFrame, true)
-        end)
+        else
+            -- Preserve logical requests if Blizzard reacquires the same cooldown,
+            -- but never redraw here. If identity changes, discard the old state.
+            state.acquireGeneration = state.acquireGeneration + 1
+            local generation = state.acquireGeneration
+            local oldCooldownID = state.boundCooldownID
+            C_Timer.After(0, function()
+                if states[itemFrame] ~= state then return end
+                if state.acquireGeneration ~= generation then return end
+                if oldCooldownID ~= nil and itemFrame.cooldownID ~= oldCooldownID then
+                    ResetPrimary(itemFrame)
+                end
+            end)
+        end
+
+        if self.HidePandemicGlow then
+            self:HidePandemicGlow(itemFrame)
+        end
     end)
 end
 
 Glow.RefreshActiveGlows = function(self, forceUpdate)
-    if specTransitionSuspended then return end
+    if IsPrimaryGlowSuspended() then return end
     local version = self.visualConfigVersion or 0
     local configChanged = version ~= lastVisualConfigVersion
     lastVisualConfigVersion = version
@@ -574,7 +664,7 @@ Glow.RefreshActiveGlows = function(self, forceUpdate)
 end
 
 Glow.RefreshSpellGlowTypeOverrides = function(self)
-    if specTransitionSuspended then return end
+    if IsPrimaryGlowSuspended() then return end
     for frame in pairs(states) do RefreshFrame(frame, false) end
 end
 
