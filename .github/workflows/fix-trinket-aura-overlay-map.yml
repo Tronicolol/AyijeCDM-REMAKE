@@ -24,51 +24,43 @@ jobs:
 
           p = Path('KCDM/Modules/CooldownGroups.lua')
           text = p.read_text(encoding='utf-8')
+          start = text.index('local function AuraOverlayFallback(info, spellToEntry)')
+          end = text.index('\nlocal AURA_OVERLAY_MATCH_OPTS', start)
 
-          old = '''local function AuraOverlayFallback(info, spellToEntry)
-    local match
-    CDM:ForEachSpellMatchCandidate(info.spellID, function(candidate)
-        local entry = spellToEntry[candidate]
-        if not entry then return end
-        if entry.dotDefaultOnly then return end
-        match = entry
-        return true
-    end)
-    return match
-end'''
+          new = '\n'.join([
+              'local function AuraOverlayFallback(info, spellToEntry)',
+              '    local match',
+              '',
+              '    local function TrySpellID(spellID)',
+              '        if match or not IsSafeNumber(spellID) then return end',
+              '        CDM:ForEachSpellMatchCandidate(spellID, function(candidate)',
+              '            local entry = spellToEntry[candidate]',
+              '            if not entry then return end',
+              '            if entry.dotDefaultOnly then return end',
+              '            match = entry',
+              '            return true',
+              '        end)',
+              '    end',
+              '',
+              '    TrySpellID(info.overrideTooltipSpellID)',
+              '    TrySpellID(info.overrideSpellID)',
+              '    TrySpellID(info.spellID)',
+              '',
+              '    if not match and info.linkedSpellIDs then',
+              '        for _, linkedSpellID in ipairs(info.linkedSpellIDs) do',
+              '            TrySpellID(linkedSpellID)',
+              '            if match then break end',
+              '        end',
+              '    end',
+              '',
+              '    return match',
+              'end',
+          ])
 
-          new = '''local function AuraOverlayFallback(info, spellToEntry)
-    local match
-
-    local function TrySpellID(spellID)
-        if match or not IsSafeNumber(spellID) then return end
-        CDM:ForEachSpellMatchCandidate(spellID, function(candidate)
-            local entry = spellToEntry[candidate]
-            if not entry then return end
-            if entry.dotDefaultOnly then return end
-            match = entry
-            return true
-        end)
-    end
-
-    TrySpellID(info.overrideTooltipSpellID)
-    TrySpellID(info.overrideSpellID)
-    TrySpellID(info.spellID)
-
-    if not match and info.linkedSpellIDs then
-        for _, linkedSpellID in ipairs(info.linkedSpellIDs) do
-            TrySpellID(linkedSpellID)
-            if match then break end
-        end
-    end
-
-    return match
-end'''
-
-          if text.count(old) != 1:
-              raise SystemExit(f'expected exactly one AuraOverlayFallback target, found {text.count(old)}')
-
-          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          current = text[start:end]
+          if 'CDM:ForEachSpellMatchCandidate(info.spellID' not in current:
+              raise SystemExit('unexpected current AuraOverlayFallback implementation')
+          p.write_text(text[:start] + new + text[end:], encoding='utf-8')
 
           embeds = Path('KCDM/Core/embeds.xml')
           embeds_text = embeds.read_text(encoding='utf-8')
@@ -108,7 +100,6 @@ end'''
           }
           assert changed == expected, (changed, expected)
 
-          # The known-good cooldown/rendering path must remain untouched.
           subprocess.check_call(['git', 'diff', '--exit-code', 'origin/main', '--', 'KCDM/Core/Style.lua'])
           subprocess.check_call(['git', 'diff', '--exit-code', 'origin/main', '--', 'KCDM/Core/Glow.lua'])
 
