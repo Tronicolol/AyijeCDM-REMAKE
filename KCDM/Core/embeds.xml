@@ -19,4 +19,5 @@
     <Script file="GlowDirector.lua"/>
     <Script file="InternalCallbacks.lua"/>
     <Script file="SpecChange.lua"/>
+    <Script file="TrinketAuraDebug.lua"/>
 </Ui>
