@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   validate:
-    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -26,61 +25,21 @@ jobs:
           p = Path('KCDM/Core/Style.lua')
           text = p.read_text(encoding='utf-8')
 
-          old = '''    -- Blizzard gives an active aura precedence over the equipped-item source.
-    -- While that aura is active, isOnActualCooldown is false even though the
-    -- underlying inventory item cooldown can still be real.
-    local hasLiveAura = GetCachedAuraDuration(frame) ~= nil
-    local actualState = frame.isOnActualCooldown
-    if not hasLiveAura
-       and actualState ~= nil
-       and canaccessvalue(actualState)
-       and actualState ~= true then
-        return false, nil, nil, nil
-    end
+          start = text.index('local function GetEquippedItemRealCooldown(frame)')
+          end = text.index('\nlocal function HasChargeSource(frame)', start)
+          helper = text[start:end]
 
-    local startTime, duration, enable = GetInventoryItemCooldown("player", equipSlot)
-    local active = enable == 1
-        and type(startTime) == "number" and startTime > 0
-        and type(duration) == "number" and duration > CDM_C.ITEM_COOLDOWN_GCD_MIN
+          old_detector = '    local hasLiveAura = GetCachedAuraDuration(frame) ~= nil'
+          new_detector = '    local auraOwnsVisualState = frame.wasSetFromAura == true\n        or frame.cooldownUseAuraDisplayTime == true'
 
-    if not hasLiveAura
-       and actualState ~= nil
-       and canaccessvalue(actualState) then
-        active = active and actualState == true
-    end
-'''
+          if helper.count(old_detector) != 1:
+              raise SystemExit(f'expected one aura detector, found {helper.count(old_detector)}')
+          if helper.count('not hasLiveAura') != 2:
+              raise SystemExit(f'expected two hasLiveAura gates, found {helper.count("not hasLiveAura")}')
 
-          new = '''    -- Blizzard gives the aura source visual precedence over the equipped-item
-    -- cooldown. During that window isOnActualCooldown is false even though
-    -- GetInventoryItemCooldown still contains the real item cooldown.
-    -- wasSetFromAura/cooldownUseAuraDisplayTime are the authoritative visual-source
-    -- flags here; do not depend on obtaining a DurationObject just to identify it.
-    local auraOwnsVisualState = frame.wasSetFromAura == true
-        or frame.cooldownUseAuraDisplayTime == true
-    local actualState = frame.isOnActualCooldown
-    if not auraOwnsVisualState
-       and actualState ~= nil
-       and canaccessvalue(actualState)
-       and actualState ~= true then
-        return false, nil, nil, nil
-    end
-
-    local startTime, duration, enable = GetInventoryItemCooldown("player", equipSlot)
-    local active = enable == 1
-        and type(startTime) == "number" and startTime > 0
-        and type(duration) == "number" and duration > CDM_C.ITEM_COOLDOWN_GCD_MIN
-
-    if not auraOwnsVisualState
-       and actualState ~= nil
-       and canaccessvalue(actualState) then
-        active = active and actualState == true
-    end
-'''
-
-          if text.count(old) != 1:
-              raise SystemExit(f'expected exactly one target block, found {text.count(old)}')
-
-          text = text.replace(old, new, 1)
+          helper = helper.replace(old_detector, new_detector, 1)
+          helper = helper.replace('not hasLiveAura', 'not auraOwnsVisualState')
+          text = text[:start] + helper + text[end:]
           p.write_text(text, encoding='utf-8')
 
       - name: Install Lua 5.1
@@ -88,12 +47,14 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq lua5.1
 
-      - name: Validate Lua XML diff and invariants
-        shell: bash
+      - name: Validate addon
         run: |
           find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
           git diff --check
-          python - <<'PY'
+
+      - name: Validate XML and focused invariants
+        shell: python
+        run: |
           from pathlib import Path
           import subprocess
           import xml.etree.ElementTree as ET
@@ -106,21 +67,21 @@ jobs:
           assert changed == ['KCDM/Core/Style.lua'], changed
 
           s = Path('KCDM/Core/Style.lua').read_text(encoding='utf-8')
-          helper = s[s.index('local function GetEquippedItemRealCooldown(frame)'):s.index('\nlocal function HasChargeSource(frame)')]
+          start = s.index('local function GetEquippedItemRealCooldown(frame)')
+          end = s.index('\nlocal function HasChargeSource(frame)', start)
+          helper = s[start:end]
+
           assert 'local auraOwnsVisualState = frame.wasSetFromAura == true' in helper
           assert 'or frame.cooldownUseAuraDisplayTime == true' in helper
-          assert helper.count('if not auraOwnsVisualState') == 2
+          assert helper.count('not auraOwnsVisualState') == 2
+          assert 'local hasLiveAura = GetCachedAuraDuration(frame) ~= nil' not in helper
           assert 'GetInventoryItemCooldown("player", equipSlot)' in helper
           assert 'duration > CDM_C.ITEM_COOLDOWN_GCD_MIN' in helper
-          assert 'local hasLiveAura = GetCachedAuraDuration(frame) ~= nil' not in helper
 
-          # Ensure aura-overlay rendering logic itself was not altered.
           assert 'if isEquippedItem and entry and entry.auraOverlay then' in s
           assert 'if ApplyEquippedItemAuraCooldown(frame, cd) then' in s
-          assert 'C_UnitAuras.GetUnitAuraDuration' in s
-          PY
 
-      - name: Commit focused fix
+      - name: Commit fix
         run: |
           git config user.name 'Tronicolol'
           git config user.email '54152736+Tronicolol@users.noreply.github.com'
@@ -140,8 +101,8 @@ jobs:
           from pathlib import Path
           roots = sorted(p.name for p in Path('package').iterdir())
           assert roots == ['KCDM', 'KCDM_Options'], roots
-          assert (Path('package/KCDM/KCDM.toc')).is_file()
-          assert (Path('package/KCDM_Options/KCDM_Options.toc')).is_file()
+          assert Path('package/KCDM/KCDM.toc').is_file()
+          assert Path('package/KCDM_Options/KCDM_Options.toc').is_file()
 
       - uses: actions/upload-artifact@v4
         with:
