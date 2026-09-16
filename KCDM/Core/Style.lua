@@ -417,11 +417,15 @@ local function GetEquippedItemRealCooldown(frame)
         return false, nil, nil, nil
     end
 
-    -- Blizzard has already filtered shared trinket/GCD categories when it sets
-    -- isOnActualCooldown. Reuse that decision so an unused trinket never shows
-    -- the shared lockout as its own cooldown.
+    -- Blizzard gives an active aura precedence over the equipped-item source.
+    -- While that aura is active, isOnActualCooldown is false even though the
+    -- underlying inventory item cooldown can still be real.
+    local hasLiveAura = GetCachedAuraDuration(frame) ~= nil
     local actualState = frame.isOnActualCooldown
-    if actualState ~= nil and canaccessvalue(actualState) and actualState ~= true then
+    if not hasLiveAura
+       and actualState ~= nil
+       and canaccessvalue(actualState)
+       and actualState ~= true then
         return false, nil, nil, nil
     end
 
@@ -430,7 +434,9 @@ local function GetEquippedItemRealCooldown(frame)
         and type(startTime) == "number" and startTime > 0
         and type(duration) == "number" and duration > CDM_C.ITEM_COOLDOWN_GCD_MIN
 
-    if actualState ~= nil and canaccessvalue(actualState) then
+    if not hasLiveAura
+       and actualState ~= nil
+       and canaccessvalue(actualState) then
         active = active and actualState == true
     end
 
