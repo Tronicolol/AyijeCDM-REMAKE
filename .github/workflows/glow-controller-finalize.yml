@@ -1,0 +1,98 @@
+name: Finalize glow controller
+
+on:
+  push:
+    branches:
+      - arreglos-visuales
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arreglos-visuales
+          fetch-depth: 0
+
+      - name: Add rendered color snapshots
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('KCDM/Modules/GlowController.lua')
+          text = p.read_text(encoding='utf-8')
+
+          old = '''local function ColorsMatch(a, b)\n    if a == b then return true end\n    if not a or not b then return false end\n    local ar, ag, ab, aa = ReadColor(a)\n    local br, bg, bb, ba = ReadColor(b)\n    return ar == br and ag == bg and ab == bb and aa == ba\nend\n\n'''
+          new = '''local function GetEffectiveColorValues(overrideColor)\n    local color = overrideColor\n    if not color and GetCfg("glowUseCustomColor", false) then\n        color = GetCfg("glowColor", nil)\n    end\n    if not color then return false end\n    local r, g, b, a = ReadColor(color)\n    return true, r, g, b, a\nend\n\nlocal function RenderedColorMatches(host, overrideColor)\n    local hasColor, r, g, b, a = GetEffectiveColorValues(overrideColor)\n    if host.cdmUnifiedGlowHasColor ~= hasColor then return false end\n    if not hasColor then return true end\n    return host.cdmUnifiedGlowR == r\n        and host.cdmUnifiedGlowG == g\n        and host.cdmUnifiedGlowB == b\n        and host.cdmUnifiedGlowA == a\nend\n\nlocal function StoreRenderedColor(host, overrideColor)\n    local hasColor, r, g, b, a = GetEffectiveColorValues(overrideColor)\n    host.cdmUnifiedGlowHasColor = hasColor\n    host.cdmUnifiedGlowR = r\n    host.cdmUnifiedGlowG = g\n    host.cdmUnifiedGlowB = b\n    host.cdmUnifiedGlowA = a\nend\n\n'''
+          if text.count(old) != 1:
+              raise SystemExit('ColorsMatch block mismatch')
+          text = text.replace(old, new, 1)
+
+          old = '''    host.cdmGlowOverrideColor = nil\n    host.cdmUnifiedGlowVersion = nil\nend\n'''
+          new = '''    host.cdmGlowOverrideColor = nil\n    host.cdmUnifiedGlowVersion = nil\n    host.cdmUnifiedGlowHasColor = nil\n    host.cdmUnifiedGlowR = nil\n    host.cdmUnifiedGlowG = nil\n    host.cdmUnifiedGlowB = nil\n    host.cdmUnifiedGlowA = nil\nend\n'''
+          if text.count(old) != 1:
+              raise SystemExit('HardStop color reset block mismatch')
+          text = text.replace(old, new, 1)
+
+          old = '''    local sameVisual = host.cdmGlowActive == true\n        and host.cdmGlowType == glowType\n        and ColorsMatch(host.cdmGlowOverrideColor, request.overrideColor)\n        and host.cdmUnifiedGlowVersion == version\n'''
+          new = '''    local sameVisual = host.cdmGlowActive == true\n        and host.cdmGlowType == glowType\n        and RenderedColorMatches(host, request.overrideColor)\n        and host.cdmUnifiedGlowVersion == version\n'''
+          if text.count(old) != 1:
+              raise SystemExit('sameVisual block mismatch')
+          text = text.replace(old, new, 1)
+
+          old = '''        host.cdmGlowOverrideColor = request.overrideColor\n        host.cdmUnifiedGlowVersion = version\n    elseif forceUpdate then\n        StartOrUpdateHost(host, glowType, request.overrideColor)\n    end\n'''
+          new = '''        host.cdmGlowOverrideColor = request.overrideColor\n        host.cdmUnifiedGlowVersion = version\n        StoreRenderedColor(host, request.overrideColor)\n    elseif forceUpdate then\n        StartOrUpdateHost(host, glowType, request.overrideColor)\n        StoreRenderedColor(host, request.overrideColor)\n    end\n'''
+          if text.count(old) != 1:
+              raise SystemExit('visual state store block mismatch')
+          text = text.replace(old, new, 1)
+
+          p.write_text(text, encoding='utf-8')
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate every addon Lua file
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+
+      - name: Validate XML scripts and glow ownership
+        shell: python
+        run: |
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for xml in Path('KCDM').rglob('*.xml'):
+              ET.parse(xml)
+          for xml in Path('KCDM_Options').rglob('*.xml'):
+              ET.parse(xml)
+          modules = ET.parse('KCDM/Modules/embeds.xml').getroot()
+          scripts = [n.attrib['file'] for n in modules if n.tag.endswith('Script')]
+          assert scripts.index('GlowController.lua') > scripts.index('PerSpellGlowTypeResolver.lua')
+          controller = Path('KCDM/Modules/GlowController.lua').read_text(encoding='utf-8')
+          assert 'RenderedColorMatches' in controller
+          assert 'HardStopButton' in controller
+          assert 'local PRODUCER_ORDER = { "alert", "aura", "buff", "ready" }' in controller
+          assert 'local currentCharges = ci.currentCharges' in Path('KCDM/Core/GlowDirector.lua').read_text(encoding='utf-8')
+
+      - name: Commit final controller fix
+        run: |
+          git config user.name 'Tronicolol'
+          git config user.email '54152736+Tronicolol@users.noreply.github.com'
+          git add KCDM/Modules/GlowController.lua
+          git commit -m 'Track rendered glow color values [skip ci]'
+          git push origin HEAD:arreglos-visuales
+
+      - name: Build complete KCDM
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ayije-Glow-Controller-V2
+          path: package/
+          if-no-files-found: error
