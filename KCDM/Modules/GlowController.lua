@@ -51,12 +51,33 @@ local function ReadColor(color)
            color.a or color[4] or 1
 end
 
-local function ColorsMatch(a, b)
-    if a == b then return true end
-    if not a or not b then return false end
-    local ar, ag, ab, aa = ReadColor(a)
-    local br, bg, bb, ba = ReadColor(b)
-    return ar == br and ag == bg and ab == bb and aa == ba
+local function GetEffectiveColorValues(overrideColor)
+    local color = overrideColor
+    if not color and GetCfg("glowUseCustomColor", false) then
+        color = GetCfg("glowColor", nil)
+    end
+    if not color then return false end
+    local r, g, b, a = ReadColor(color)
+    return true, r, g, b, a
+end
+
+local function RenderedColorMatches(host, overrideColor)
+    local hasColor, r, g, b, a = GetEffectiveColorValues(overrideColor)
+    if host.cdmUnifiedGlowHasColor ~= hasColor then return false end
+    if not hasColor then return true end
+    return host.cdmUnifiedGlowR == r
+        and host.cdmUnifiedGlowG == g
+        and host.cdmUnifiedGlowB == b
+        and host.cdmUnifiedGlowA == a
+end
+
+local function StoreRenderedColor(host, overrideColor)
+    local hasColor, r, g, b, a = GetEffectiveColorValues(overrideColor)
+    host.cdmUnifiedGlowHasColor = hasColor
+    host.cdmUnifiedGlowR = r
+    host.cdmUnifiedGlowG = g
+    host.cdmUnifiedGlowB = b
+    host.cdmUnifiedGlowA = a
 end
 
 local function ToColorArray(color)
@@ -112,6 +133,11 @@ local function HardStopHost(host)
     host.cdmGlowOverrideType = nil
     host.cdmGlowOverrideColor = nil
     host.cdmUnifiedGlowVersion = nil
+    host.cdmUnifiedGlowHasColor = nil
+    host.cdmUnifiedGlowR = nil
+    host.cdmUnifiedGlowG = nil
+    host.cdmUnifiedGlowB = nil
+    host.cdmUnifiedGlowA = nil
 end
 
 local function StartOrUpdateHost(host, glowType, overrideColor)
@@ -339,7 +365,7 @@ local function ApplyVisual(frame, request, forceUpdate)
     local version = Glow.visualConfigVersion or 0
     local sameVisual = host.cdmGlowActive == true
         and host.cdmGlowType == glowType
-        and ColorsMatch(host.cdmGlowOverrideColor, request.overrideColor)
+        and RenderedColorMatches(host, request.overrideColor)
         and host.cdmUnifiedGlowVersion == version
 
     if not sameVisual then
@@ -354,8 +380,10 @@ local function ApplyVisual(frame, request, forceUpdate)
         host.cdmGlowOverrideType = glowType
         host.cdmGlowOverrideColor = request.overrideColor
         host.cdmUnifiedGlowVersion = version
+        StoreRenderedColor(host, request.overrideColor)
     elseif forceUpdate then
         StartOrUpdateHost(host, glowType, request.overrideColor)
+        StoreRenderedColor(host, request.overrideColor)
     end
     host:SetShown(frame:IsShown())
 end
