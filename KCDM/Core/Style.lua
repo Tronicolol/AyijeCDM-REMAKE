@@ -372,7 +372,7 @@ end
 
 local function GetCachedAuraDuration(frame)
     local auraData = GetCachedAuraData(frame)
-    if not auraData or not C_UnitAuras or type(C_UnitAuras.GetAuraDuration) ~= "function" then return nil end
+    if not auraData or not C_UnitAuras or type(C_UnitAuras.GetUnitAuraDuration) ~= "function" then return nil end
 
     local auraInstanceID = auraData.auraInstanceID
     if not auraInstanceID then return nil end
@@ -385,7 +385,7 @@ local function GetCachedAuraDuration(frame)
         end
     end
 
-    local ok, durationObject = pcall(C_UnitAuras.GetAuraDuration, auraUnit, auraInstanceID)
+    local ok, durationObject = pcall(C_UnitAuras.GetUnitAuraDuration, auraUnit, auraInstanceID)
     if not ok then return nil end
     return durationObject
 end
