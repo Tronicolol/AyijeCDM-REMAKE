@@ -1,0 +1,87 @@
+name: Validate clean unified glow controller
+
+on:
+  push:
+    branches:
+      - arreglos-visuales
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: arreglos-visuales
+          fetch-depth: 0
+
+      - name: Consolidate per-spell glow ownership
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('KCDM/Modules/GlowController.lua')
+          text = p.read_text(encoding='utf-8')
+          callback = '''\nCDM:RegisterRefreshCallback("unifiedGlowController", function()\n    Glow:RefreshSpellGlowTypeOverrides()\nend, 55, { "STYLE", "CD_DATA" })\n'''
+          if 'RegisterRefreshCallback("unifiedGlowController"' not in text:
+              p.write_text(text.rstrip() + '\n' + callback, encoding='utf-8')
+
+          p = Path('KCDM/Modules/embeds.xml')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('    <Script file="PerSpellGlowType.lua"/>\n', '')
+          text = text.replace('    <Script file="PerSpellGlowTypeResolver.lua"/>\n', '')
+          p.write_text(text, encoding='utf-8')
+
+      - name: Remove superseded glow wrappers
+        run: |
+          rm -f KCDM/Modules/PerSpellGlowType.lua KCDM/Modules/PerSpellGlowTypeResolver.lua
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate complete addon
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check
+
+      - name: Validate ownership and load order
+        shell: python
+        run: |
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+          xml = Path('KCDM/Modules/embeds.xml').read_text(encoding='utf-8')
+          assert 'GlowController.lua' in xml
+          assert 'PerSpellGlowType.lua' not in xml
+          assert 'PerSpellGlowTypeResolver.lua' not in xml
+          c = Path('KCDM/Modules/GlowController.lua').read_text(encoding='utf-8')
+          assert 'RegisterRefreshCallback("unifiedGlowController"' in c
+          assert 'Glow.RequestBuffGlow = function' in c
+          assert 'HardStopButton' in c
+          assert 'RenderedColorMatches' in c
+          assert 'return currentCharges > 0' in Path('KCDM/Core/GlowDirector.lua').read_text(encoding='utf-8')
+
+      - name: Commit consolidated controller
+        run: |
+          git config user.name 'Tronicolol'
+          git config user.email '54152736+Tronicolol@users.noreply.github.com'
+          git add KCDM/Modules
+          git commit -m 'Consolidate glow ownership into one controller [skip ci]'
+          git push origin HEAD:arreglos-visuales
+
+      - name: Build complete KCDM
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ayije-Unified-Glow-Final-Test
+          path: package/
+          if-no-files-found: error
