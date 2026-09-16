@@ -1,0 +1,227 @@
+name: Fix runtime aura map for active items v2
+
+on:
+  push:
+    branches:
+      - fix-trinket-aura-overlay-glow
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-trinket-aura-overlay-glow
+          fetch-depth: 0
+
+      - name: Apply focused runtime-map fix
+        shell: python
+        run: |
+          from pathlib import Path
+          import subprocess
+
+          # Restore the failed matcher experiment exactly to the known-good main version.
+          main_cg = subprocess.check_output(
+              ['git', 'show', 'origin/main:KCDM/Modules/CooldownGroups.lua'],
+              text=True,
+          )
+          Path('KCDM/Modules/CooldownGroups.lua').write_text(main_cg, encoding='utf-8')
+
+          # Keep the built spell-level aura map and resolve live frames whose
+          # cooldownID is absent from Blizzard category sets.
+          p = Path('KCDM/Core/SpellUtils.lua')
+          text = p.read_text(encoding='utf-8')
+
+          target = '    local auraSpellToEntry = self._BuildAuraOverlaySpellMap and self:_BuildAuraOverlaySpellMap(specID) or {}\n'
+          if text.count(target) != 1:
+              raise SystemExit(f'aura map target count={text.count(target)}')
+          text = text.replace(target, target + '    self._auraOverlaySpellMap = auraSpellToEntry\n', 1)
+
+          marker = 'function CDM:GetPreferredBuffGroupSpellID(frame)\n'
+          if text.count(marker) != 1:
+              raise SystemExit(f'resolver marker count={text.count(marker)}')
+          resolver = '''function CDM:ResolveAuraOverlayEntryForFrame(frame)
+              if not frame then return nil end
+
+              local cooldownID = frame.cooldownID
+              local auraMap = self._auraOverlayEnabled
+              if not cooldownID or not auraMap then return nil end
+
+              local cached = auraMap[cooldownID]
+              if cached then return cached end
+
+              local spellMap = self._auraOverlaySpellMap
+              local opts = self.AURA_OVERLAY_MATCH_OPTS
+              if not spellMap or not opts then return nil end
+
+              local info = GetFrameCooldownInfo(frame)
+              if not info then return nil end
+
+              local entry = MatchCooldownInfo(info, spellMap, opts)
+              if not entry then return nil end
+
+              auraMap[cooldownID] = entry
+              if entry.readyGlowEnabled and self._readyGlowCooldownIDs then
+                  self._readyGlowCooldownIDs[cooldownID] = true
+              end
+
+              return entry
+          end
+
+          '''
+          text = text.replace(marker, resolver + marker, 1)
+
+          anchor = '\n    if previousCdMatches and cdSets then\n'
+          if text.count(anchor) != 1:
+              raise SystemExit(f'active-frame anchor count={text.count(anchor)}')
+          proactive = '''
+              -- Equipped-item frames can exist at runtime without appearing in any
+              -- CooldownViewer category set. Resolve those live frames before the
+              -- glow index is rebuilt.
+              if auraMap and self.ForEachActiveFrame and self.CONST and self.CONST.COOLDOWN_VIEWER_NAMES then
+                  self:ForEachActiveFrame(self.CONST.COOLDOWN_VIEWER_NAMES, function(frame)
+                      self:ResolveAuraOverlayEntryForFrame(frame)
+                  end)
+              end
+          '''
+          text = text.replace(anchor, '\n' + proactive + anchor, 1)
+          p.write_text(text, encoding='utf-8')
+
+          # Late-acquired runtime-only frames resolve lazily from their cooldownInfo.
+          p = Path('KCDM/Core/Style.lua')
+          text = p.read_text(encoding='utf-8')
+          old = '''local function FindAuraOverlayEntry(frame)
+              local map = CDM._auraOverlayEnabled
+              if not map then return nil end
+              local cdID = frame and frame.cooldownID
+              if cdID and map[cdID] then return map[cdID] end
+              return nil
+          end'''
+          new = '''local function FindAuraOverlayEntry(frame)
+              local map = CDM._auraOverlayEnabled
+              if not map then return nil end
+              local cdID = frame and frame.cooldownID
+              if not cdID then return nil end
+              if map[cdID] then return map[cdID] end
+              if CDM.ResolveAuraOverlayEntryForFrame then
+                  return CDM:ResolveAuraOverlayEntryForFrame(frame)
+              end
+              return nil
+          end'''
+          if text.count(old) != 1:
+              raise SystemExit(f'Style lookup count={text.count(old)}')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Make late runtime-only IDs available before ready-glow registration too.
+          p = Path('KCDM/Core/GlowDirector.lua')
+          text = p.read_text(encoding='utf-8')
+          old = '''    local cdID = frame.cooldownID
+              if not cdID then return end
+              local readySet = CDM._readyGlowCooldownIDs
+              if not readySet or not readySet[cdID] then return end'''
+          new = '''    local cdID = frame.cooldownID
+              if not cdID then return end
+              if CDM.ResolveAuraOverlayEntryForFrame then
+                  CDM:ResolveAuraOverlayEntryForFrame(frame)
+              end
+              local readySet = CDM._readyGlowCooldownIDs
+              if not readySet or not readySet[cdID] then return end'''
+          if text.count(old) != 1:
+              raise SystemExit(f'GlowDirector hook count={text.count(old)}')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Remove runtime diagnostic from final addon.
+          embeds = Path('KCDM/Modules/embeds.xml')
+          embeds_text = embeds.read_text(encoding='utf-8')
+          diag_line = '    <Script file="TrinketAuraMapDebug.lua"/>\n'
+          if embeds_text.count(diag_line) != 1:
+              raise SystemExit(f'diagnostic embed count={embeds_text.count(diag_line)}')
+          embeds.write_text(embeds_text.replace(diag_line, '', 1), encoding='utf-8')
+          diag = Path('KCDM/Modules/TrinketAuraMapDebug.lua')
+          if not diag.exists():
+              raise SystemExit('diagnostic file missing')
+          diag.unlink()
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate code and regression scope
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import xml.etree.ElementTree as ET
+
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+
+          # Previous failed matcher change must be completely gone.
+          subprocess.check_call(['git', 'diff', '--exit-code', 'origin/main', '--', 'KCDM/Modules/CooldownGroups.lua'])
+
+          assert not Path('KCDM/Modules/TrinketAuraMapDebug.lua').exists()
+          assert 'TrinketAuraMapDebug.lua' not in Path('KCDM/Modules/embeds.xml').read_text(encoding='utf-8')
+
+          spell = Path('KCDM/Core/SpellUtils.lua').read_text(encoding='utf-8')
+          assert 'function CDM:ResolveAuraOverlayEntryForFrame(frame)' in spell
+          assert 'self._auraOverlaySpellMap = auraSpellToEntry' in spell
+          assert 'self:ResolveAuraOverlayEntryForFrame(frame)' in spell
+
+          style = Path('KCDM/Core/Style.lua').read_text(encoding='utf-8')
+          assert 'return CDM:ResolveAuraOverlayEntryForFrame(frame)' in style
+
+          glow = Path('KCDM/Core/GlowDirector.lua').read_text(encoding='utf-8')
+          assert 'CDM:ResolveAuraOverlayEntryForFrame(frame)' in glow
+          PY
+
+      - name: Commit focused fix
+        run: |
+          git config user.name 'Tronicolol'
+          git config user.email '54152736+Tronicolol@users.noreply.github.com'
+          git add -A KCDM
+          git commit -m 'Resolve aura overlays for runtime-only cooldown items [skip ci]'
+          git push origin HEAD:fix-trinket-aura-overlay-glow
+
+      - name: Verify final functional diff against main
+        run: |
+          git fetch origin main
+          python - <<'PY'
+          import subprocess
+          files = set(subprocess.check_output(['git', 'diff', '--name-only', 'origin/main...HEAD'], text=True).splitlines())
+          expected = {
+              'KCDM/Core/SpellUtils.lua',
+              'KCDM/Core/Style.lua',
+              'KCDM/Core/GlowDirector.lua',
+          }
+          assert files == expected, (files, expected)
+          PY
+          git diff --check origin/main...HEAD
+
+      - name: Build complete addon package
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+          cp -a KCDM_Options package/KCDM_Options
+
+      - name: Verify complete package roots
+        shell: python
+        run: |
+          from pathlib import Path
+          roots = sorted(p.name for p in Path('package').iterdir())
+          assert roots == ['KCDM', 'KCDM_Options'], roots
+          assert Path('package/KCDM/KCDM.toc').is_file()
+          assert Path('package/KCDM_Options/KCDM_Options.toc').is_file()
+          assert not Path('package/KCDM/Modules/TrinketAuraMapDebug.lua').exists()
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KCDM-Runtime-Only-Trinket-Aura-Glow-Fix
+          path: package/
+          if-no-files-found: error
