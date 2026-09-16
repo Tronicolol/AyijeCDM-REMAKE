@@ -363,6 +363,15 @@ local function IsEquippedItemCooldownFrame(frame)
     return GetEquippedItemSlot(frame) ~= nil
 end
 
+local function IsNativeAuraActive(frame)
+    if not frame then return false end
+    if frame.cooldownUseAuraDisplayTime == true then return true end
+    if type(frame.GetAuraSpellID) ~= "function" then return false end
+
+    local ok, auraSpellID = pcall(frame.GetAuraSpellID, frame)
+    return ok and IsSafeNumber(auraSpellID) and auraSpellID > 0
+end
+
 local function GetEquippedItemRealCooldown(frame)
     local equipSlot = GetEquippedItemSlot(frame)
     if not equipSlot or not GetInventoryItemCooldown then
@@ -673,8 +682,8 @@ function CDM:RefreshFrameVisuals(frame, skipDesat)
     if not frame then return end
     if not VIEWERS_WITH_OVERRIDE[frame.cdmViewerName] then return end
     local entry = FindAuraOverlayEntry(frame)
-    local blizzardAuraActive = (frame.cooldownUseAuraDisplayTime == true)
-    local auraActive = entry and entry.auraOverlay == true and blizzardAuraActive or false
+    local nativeAuraActive = IsNativeAuraActive(frame)
+    local auraActive = entry and entry.auraOverlay == true and nativeAuraActive or false
     local sid = GetCastSpellID(frame)
     frame.cdmLastAuraActive = auraActive
     if not skipDesat then
@@ -1153,7 +1162,7 @@ function CDM:ApplyStyle(frame, vName, forceUpdate)
                 hooksecurefunc(iconTex, "SetDesaturated", function(_, desaturated)
                     if frame.cdmInternalWrite then return end
                     local entry = FindAuraOverlayEntry(frame)
-                    local auraActive = (frame.cooldownUseAuraDisplayTime == true)
+                    local auraActive = entry and entry.auraOverlay == true and IsNativeAuraActive(frame) or false
                     ApplyIconDesat(frame, entry, auraActive, GetCastSpellID(frame), desaturated)
                 end)
             end
@@ -1165,7 +1174,7 @@ function CDM:ApplyStyle(frame, vName, forceUpdate)
                 local function RefreshCooldownAppearanceAfterBlizzard()
                     if not frame or not frame.Icon then return end
                     local entry = FindAuraOverlayEntry(frame)
-                    local auraActive = (frame.cooldownUseAuraDisplayTime == true)
+                    local auraActive = entry and entry.auraOverlay == true and IsNativeAuraActive(frame) or false
                     ApplyCooldownIconAppearance(frame, entry, auraActive, GetCastSpellID(frame))
                 end
 
@@ -1173,7 +1182,7 @@ function CDM:ApplyStyle(frame, vName, forceUpdate)
                     local entry = FindAuraOverlayEntry(frame)
                     if entry
                        or frame.cdmLastAuraActive
-                       or frame.cooldownUseAuraDisplayTime == true
+                       or IsNativeAuraActive(frame)
                        or frame.cdmCooldownOverlayStyleApplied
                        or HasChargeSource(frame) then
                         ApplyBaseSwipeStyle(cd, frame)
