@@ -1,0 +1,138 @@
+name: Remove tainted native refresh
+
+on:
+  push:
+    branches:
+      - fix-trinket-aura-overlay-glow
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-trinket-aura-overlay-glow
+          fetch-depth: 0
+
+      - name: Remove unsafe Blizzard RefreshData call
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('KCDM/Core/Style.lua')
+          text = p.read_text(encoding='utf-8')
+
+          helper = '''local function QueueEquippedItemNativeRefresh(frame)
+              if not frame or frame.cdmEquippedItemNativeRefreshPending then return end
+              if type(frame.RefreshData) ~= "function" then return end
+
+              frame.cdmEquippedItemNativeRefreshPending = true
+              C_Timer.After(0, function()
+                  frame.cdmEquippedItemNativeRefreshPending = nil
+                  if not frame.cooldownID then return end
+                  local entry = FindAuraOverlayEntry(frame)
+                  if not entry or entry.auraOverlay ~= true then return end
+                  pcall(frame.RefreshData, frame)
+              end)
+          end
+
+          '''
+          if text.count(helper) != 1:
+              raise SystemExit(f'unsafe helper count={text.count(helper)}')
+          text = text.replace(helper, '', 1)
+
+          old = '''    if isEquippedItem and entry and entry.auraOverlay then
+              if frame.cdmEquippedItemNativeOverlay ~= true then
+                  frame.cdmEquippedItemNativeOverlay = true
+                  QueueEquippedItemNativeRefresh(frame)
+              end
+
+              cd:SetHideCountdownNumbers(false)'''
+          new = '''    if isEquippedItem and entry and entry.auraOverlay then
+              cd:SetHideCountdownNumbers(false)'''
+          if text.count(old) != 1:
+              raise SystemExit(f'overlay trigger count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          old = '''        end
+              end
+          elseif isEquippedItem then
+              frame.cdmEquippedItemNativeOverlay = nil
+          end
+          if entry and entry.auraOverlay and auraActive and not isEquippedItem then'''
+          new = '''        end
+              end
+          end
+          if entry and entry.auraOverlay and auraActive and not isEquippedItem then'''
+          if text.count(old) != 1:
+              raise SystemExit(f'overlay cleanup branch count={text.count(old)}')
+          text = text.replace(old, new, 1)
+
+          text = text.replace('        itemFrame.cdmEquippedItemNativeOverlay = nil\n', '')
+          text = text.replace('        itemFrame.cdmEquippedItemNativeRefreshPending = nil\n', '')
+
+          p.write_text(text, encoding='utf-8')
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate taint fix
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import xml.etree.ElementTree as ET
+
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+
+          style = Path('KCDM/Core/Style.lua').read_text(encoding='utf-8')
+          assert 'QueueEquippedItemNativeRefresh' not in style
+          assert 'pcall(frame.RefreshData, frame)' not in style
+          assert 'cdmEquippedItemNativeOverlay' not in style
+          assert 'cdmEquippedItemNativeRefreshPending' not in style
+          # Keep the safe observer hook: Blizzard owns RefreshData; KCDM only reacts after it.
+          assert 'hooksecurefunc(frame, "RefreshData", function(self)' in style
+          # Preserve the runtime-only item resolver that fixed aura/glow mapping.
+          assert 'return CDM:ResolveAuraOverlayEntryForFrame(frame)' in style
+
+          changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
+          assert changed == {'KCDM/Core/Style.lua'}, changed
+          PY
+
+      - name: Commit taint fix
+        run: |
+          git config user.name 'Tronicolol'
+          git config user.email '54152736+Tronicolol@users.noreply.github.com'
+          git add KCDM/Core/Style.lua
+          git commit -m 'Stop forcing Blizzard RefreshData from KCDM [skip ci]'
+          git push origin HEAD:fix-trinket-aura-overlay-glow
+
+      - name: Build complete addon package
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+          cp -a KCDM_Options package/KCDM_Options
+
+      - name: Verify package roots
+        shell: python
+        run: |
+          from pathlib import Path
+          roots = sorted(p.name for p in Path('package').iterdir())
+          assert roots == ['KCDM', 'KCDM_Options'], roots
+          assert Path('package/KCDM/KCDM.toc').is_file()
+          assert Path('package/KCDM_Options/KCDM_Options.toc').is_file()
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KCDM-Taint-Safe-Aura-Glow-Fix
+          path: package/
+          if-no-files-found: error
