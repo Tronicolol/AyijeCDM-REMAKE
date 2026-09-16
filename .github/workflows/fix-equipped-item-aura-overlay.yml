@@ -1,4 +1,4 @@
-name: Fix equipped item aura overlay
+name: Validate equipped item aura overlay
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - arreglos-visuales
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -16,154 +16,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: arreglos-visuales
-          fetch-depth: 0
-
-      - name: Apply equipped item aura overlay fix
-        shell: python
-        run: |
-          from pathlib import Path
-
-          p = Path('KCDM/Core/Style.lua')
-          text = p.read_text(encoding='utf-8')
-
-          old = '''local function IsNativeAuraActive(frame)
-              return frame and frame.cooldownUseAuraDisplayTime == true or false
-          end
-
-          local function GetEquippedItemRealCooldown(frame)'''
-
-          new = '''local function GetCachedAuraData(frame)
-              if not frame or type(frame.GetAuraDataCached) ~= "function" then return nil end
-              local ok, auraData = pcall(frame.GetAuraDataCached, frame)
-              if not ok or type(auraData) ~= "table" then return nil end
-              return auraData
-          end
-
-          local function IsNativeAuraActive(frame)
-              if not frame then return false end
-              if frame.wasSetFromAura == true then return true end
-              if GetCachedAuraData(frame) then return true end
-              return frame.cooldownUseAuraDisplayTime == true or false
-          end
-
-          local function ApplyEquippedItemAuraCooldown(frame, cd)
-              if not frame or not cd then return false end
-
-              local auraData = GetCachedAuraData(frame)
-              if not auraData then return false end
-
-              local expirationTime = auraData.expirationTime
-              local duration = auraData.duration
-              local modRate = auraData.timeMod
-
-              if canaccessvalue then
-                  if expirationTime ~= nil and not canaccessvalue(expirationTime) then return false end
-                  if duration ~= nil and not canaccessvalue(duration) then return false end
-                  if modRate ~= nil and not canaccessvalue(modRate) then return false end
-              end
-
-              if type(expirationTime) ~= "number" or type(duration) ~= "number" or duration <= 0 then
-                  return false
-              end
-              if expirationTime <= GetTime() then return false end
-              if type(modRate) ~= "number" or modRate <= 0 then modRate = 1 end
-
-              local startTime = expirationTime - duration
-              cd:SetReverse(true)
-              cd:SetAlpha(1)
-              cd:SetDrawEdge(false)
-              cd:SetUseAuraDisplayTime(true)
-              cd:SetDrawSwipe(true)
-
-              if type(CooldownFrame_Set) == "function" then
-                  CooldownFrame_Set(cd, startTime, duration, true, false, modRate)
-              else
-                  cd:SetCooldown(startTime, duration, modRate)
-              end
-
-              return true
-          end
-
-          local function GetEquippedItemRealCooldown(frame)'''
-
-          if old not in text:
-              raise SystemExit('native aura helper block not found')
-          text = text.replace(old, new, 1)
-
-          function_start = text.index('local function ApplyCooldownWidget(frame, entry, auraActive, sid)')
-          function_end = text.index('\nlocal function ApplyGlows(frame, entry, auraActive)', function_start)
-          block = text[function_start:function_end]
-
-          old_early = '''    if isEquippedItem and entry and entry.auraOverlay then
-              if frame.cdmEquippedItemNativeOverlay ~= true then
-                  frame.cdmEquippedItemNativeOverlay = true
-                  QueueEquippedItemNativeRefresh(frame)
-              end
-              cd:SetHideCountdownNumbers(false)
-              frame.cdmInternalWrite = false
-              return
-          end
-
-          if isEquippedItem then
-              frame.cdmEquippedItemNativeOverlay = nil
-          end'''
-
-          new_early = '''    if isEquippedItem and entry and entry.auraOverlay then
-              if frame.cdmEquippedItemNativeOverlay ~= true then
-                  frame.cdmEquippedItemNativeOverlay = true
-                  QueueEquippedItemNativeRefresh(frame)
-              end
-
-              cd:SetHideCountdownNumbers(false)
-
-              if auraActive then
-                  if ApplyEquippedItemAuraCooldown(frame, cd) then
-                      frame.cdmCooldownOverlayStyleApplied = true
-                      frame.cdmInternalWrite = false
-                      return
-                  end
-
-                  if frame.wasSetFromAura == true or frame.cooldownUseAuraDisplayTime == true then
-                      frame.cdmCooldownOverlayStyleApplied = true
-                      frame.cdmInternalWrite = false
-                      return
-                  end
-              end
-          elseif isEquippedItem then
-              frame.cdmEquippedItemNativeOverlay = nil
-          end'''
-
-          if old_early not in block:
-              raise SystemExit('equipped item early-return block not found')
-          block = block.replace(old_early, new_early, 1)
-
-          active_old = '    if entry and entry.auraOverlay and auraActive then'
-          active_new = '    if entry and entry.auraOverlay and auraActive and not isEquippedItem then'
-          inactive_old = '    elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive then'
-          inactive_new = '    elseif entry and entry.auraOverlay and not auraActive and entry.auraDesaturateInactive and not isEquippedItem then'
-
-          if block.count(active_old) != 1:
-              raise SystemExit(f'active overlay branch count: {block.count(active_old)}')
-          if block.count(inactive_old) != 1:
-              raise SystemExit(f'inactive overlay branch count: {block.count(inactive_old)}')
-
-          block = block.replace(active_old, active_new, 1)
-          block = block.replace(inactive_old, inactive_new, 1)
-          text = text[:function_start] + block + text[function_end:]
-
-          p.write_text(text, encoding='utf-8')
 
       - name: Install Lua 5.1
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq lua5.1
 
-      - name: Validate addon
+      - name: Validate Lua
         run: |
           find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
           git diff --check
 
-      - name: Validate XML and invariants
+      - name: Validate XML and aura invariants
         shell: python
         run: |
           from pathlib import Path
@@ -185,14 +49,6 @@ jobs:
           ]
           for token in required:
               assert token in s, token
-
-      - name: Commit fix
-        run: |
-          git config user.name 'Tronicolol'
-          git config user.email '54152736+Tronicolol@users.noreply.github.com'
-          git add KCDM/Core/Style.lua
-          git commit -m 'Drive equipped item aura overlay from cached aura data [skip ci]'
-          git push origin HEAD:arreglos-visuales
 
       - name: Build complete addon package
         run: |
