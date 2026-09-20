@@ -22,5 +22,6 @@
     <Script file="TargetAuraOverlay.lua"/>
     <Script file="BlizzardProcSuppression.lua"/>
     <Script file="GlowController.lua"/>
+    <Script file="GlowLifecycleDebug.lua"/>
     <Script file="PlayerCastBar.lua"/>
 </Ui>
