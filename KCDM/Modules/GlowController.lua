@@ -697,13 +697,16 @@ Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideCol
             return
         end
 
-        if frame.cdmGlowProducer ~= producerToken then
+        local winnerToken = SelectWinner(frame, state)
+        if winnerToken and winnerToken ~= producerToken then
             return
         end
 
-        local host = frame.cdmBuffGlowHost
-        if host and host.cdmGlowActive then
-            return
+        if winnerToken == producerToken then
+            local host = frame.cdmBuffGlowHost
+            if host and host.cdmGlowActive then
+                return
+            end
         end
     end
 
