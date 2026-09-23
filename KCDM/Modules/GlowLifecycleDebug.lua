@@ -191,7 +191,7 @@ local function ResetOtherRequestRuns(frame, keepKey)
     end
 end
 
-local function Record(event, frame, a, b, c, d)
+local function Record(event, frame, a, b, c, d, e, f)
     if not enabled then return end
     CountEvent(event)
 
@@ -209,6 +209,33 @@ local function Record(event, frame, a, b, c, d)
             Push(string.format("REQUEST %s=%s src=%s run=%d %s",
                 tostring(a), b and "ON" or "OFF", tostring(c or "-"), run, snap))
         end
+        return
+    end
+
+    if event == "READY_COMPUTE" then
+        Push(string.format(
+            "READY_COMPUTE cd=%s spell=%s ready=%s reason=%s resource=%s trigger=%s %s",
+            tostring(a or "-"),
+            tostring(b or "-"),
+            c and "1" or "0",
+            tostring(d or "-"),
+            e and "1" or "0",
+            tostring(f or "-"),
+            snap
+        ))
+        return
+    end
+
+    if event == "READY_DECISION" then
+        Push(string.format(
+            "READY_DECISION spell=%s input=%s reason=%s show=%s resource=%s %s",
+            tostring(a or "-"),
+            b and "1" or "0",
+            tostring(c or "-"),
+            d and "1" or "0",
+            e and "1" or "0",
+            snap
+        ))
         return
     end
 
