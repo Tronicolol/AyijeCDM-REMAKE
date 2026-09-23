@@ -114,6 +114,106 @@ local function StopProcAnimations(host)
     if f.ProcLoopAnim and f.ProcLoopAnim:IsPlaying() then f.ProcLoopAnim:Stop() end
 end
 
+local BUTTON_GLOW_ANTS_TEXTURE = [[Interface\SpellActivationOverlay\IconAlertAnts]]
+local BUTTON_GLOW_HALO_TEXTURE = [[Interface\SpellActivationOverlay\IconAlert]]
+local BUTTON_GLOW_HALO_LEFT = 0.00781250
+local BUTTON_GLOW_HALO_RIGHT = 0.50781250
+local BUTTON_GLOW_HALO_TOP = 0.27734375
+local BUTTON_GLOW_HALO_BOTTOM = 0.52734375
+local BUTTON_GLOW_FRAMES = 22
+local BUTTON_GLOW_DEFAULT_FRAME_TIME = 0.017
+
+local function GetStableButtonLoopDuration()
+    local frequency = GetCfg("glowButtonFrequency", 0)
+    local frameTime = BUTTON_GLOW_DEFAULT_FRAME_TIME
+    if type(frequency) == "number" and frequency > 0 then
+        frameTime = 0.0025 / frequency
+    end
+    return BUTTON_GLOW_FRAMES * frameTime
+end
+
+local function EnsureStableButtonGlow(host)
+    local data = host.cdmStableButtonGlow
+    if data then return data end
+
+    local halo = host:CreateTexture(nil, "OVERLAY", nil, 6)
+    halo:SetTexture(BUTTON_GLOW_HALO_TEXTURE)
+    halo:SetTexCoord(
+        BUTTON_GLOW_HALO_LEFT,
+        BUTTON_GLOW_HALO_RIGHT,
+        BUTTON_GLOW_HALO_TOP,
+        BUTTON_GLOW_HALO_BOTTOM
+    )
+    halo:SetBlendMode("ADD")
+    halo:SetPoint("CENTER")
+    halo:Hide()
+
+    local ants = host:CreateTexture(nil, "OVERLAY", nil, 7)
+    ants:SetTexture(BUTTON_GLOW_ANTS_TEXTURE)
+    ants:SetBlendMode("ADD")
+    ants:SetPoint("CENTER")
+    ants:Hide()
+
+    local group = ants:CreateAnimationGroup()
+    group:SetLooping("REPEAT")
+
+    local flip = group:CreateAnimation("FlipBook")
+    flip:SetFlipBookRows(5)
+    flip:SetFlipBookColumns(5)
+    flip:SetFlipBookFrames(BUTTON_GLOW_FRAMES)
+    flip:SetFlipBookFrameWidth(48)
+    flip:SetFlipBookFrameHeight(48)
+    flip:SetDuration(GetStableButtonLoopDuration())
+
+    data = {
+        halo = halo,
+        ants = ants,
+        group = group,
+        flip = flip,
+    }
+    host.cdmStableButtonGlow = data
+    return data
+end
+
+local function StopStableButtonGlow(host)
+    local data = host and host.cdmStableButtonGlow
+    if not data then return end
+    if data.group:IsPlaying() then
+        data.group:Stop()
+    end
+    data.ants:Hide()
+    data.halo:Hide()
+end
+
+local function StartOrUpdateStableButtonGlow(host, overrideColor)
+    local data = EnsureStableButtonGlow(host)
+    local width, height = host:GetSize()
+    if not width or not height or width < 1 or height < 1 then return end
+
+    local hasColor, r, g, b, a = GetEffectiveColorValues(overrideColor)
+    if not hasColor then
+        r, g, b, a = 1, 1, 1, 1
+    end
+    a = a or 1
+
+    local antsWidth = width * 1.35
+    local antsHeight = height * 1.35
+    data.ants:SetSize(antsWidth, antsHeight)
+    data.halo:SetSize(antsWidth * 1.3, antsHeight * 1.3)
+
+    data.ants:SetDesaturated(hasColor and true or false)
+    data.halo:SetDesaturated(hasColor and true or false)
+    data.ants:SetVertexColor(r, g, b, a)
+    data.halo:SetVertexColor(r, g, b, a)
+    data.flip:SetDuration(GetStableButtonLoopDuration())
+
+    data.halo:Show()
+    data.ants:Show()
+    if not data.group:IsPlaying() then
+        data.group:Play()
+    end
+end
+
 local function HardStopButton(host)
     if not host or not host._ButtonGlow then return end
 
@@ -130,6 +230,7 @@ local function HardStopHost(host)
     -- ButtonGlow has an OnHide cleanup path that may release its pooled frame.
     LCG.PixelGlow_Stop(host, GLOW_KEY)
     LCG.AutoCastGlow_Stop(host, GLOW_KEY)
+    StopStableButtonGlow(host)
     HardStopButton(host)
     StopProcAnimations(host)
     LCG.ProcGlow_Stop(host, GLOW_KEY)
@@ -173,9 +274,7 @@ local function StartOrUpdateHost(host, glowType, overrideColor)
             GLOW_KEY, 5
         )
     elseif glowType == "button" then
-        local frequency = GetCfg("glowButtonFrequency", 0)
-        if frequency == 0 then frequency = nil end
-        LCG.ButtonGlow_Start(host, color, frequency, 5)
+        StartOrUpdateStableButtonGlow(host, overrideColor)
     else
         procOpts.color = color
         procOpts.duration = GetCfg("glowProcDuration", 1)
