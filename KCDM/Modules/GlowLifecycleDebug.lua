@@ -5,6 +5,8 @@ if not CDM or not CDM.Glow then return end
 local VIEWERS = CDM.CONST and CDM.CONST.VIEWERS
 if not VIEWERS then return end
 
+local LCG = LibStub("LibCustomGlow-1.0", true)
+
 local enabled = false
 local records = {}
 local recordHead = 0
@@ -17,6 +19,7 @@ local eventCounts = {}
 local requestCounts = setmetatable({}, { __mode = "k" })
 local requestRuns = setmetatable({}, { __mode = "k" })
 local lastSample = setmetatable({}, { __mode = "k" })
+local lastButtonState = setmetatable({}, { __mode = "k" })
 local anomalies = 0
 
 local driver = CreateFrame("Frame")
@@ -47,6 +50,13 @@ end
 local function SafeShown(obj)
     if not obj or type(obj.IsShown) ~= "function" then return "?" end
     local ok, value = pcall(obj.IsShown, obj)
+    if not ok or IsSecret(value) then return "?" end
+    return value and "1" or "0"
+end
+
+local function SafePlaying(group)
+    if not group or type(group.IsPlaying) ~= "function" then return "?" end
+    local ok, value = pcall(group.IsPlaying, group)
     if not ok or IsSecret(value) then return "?" end
     return value and "1" or "0"
 end
@@ -114,6 +124,31 @@ local function GlowChildren(host)
     end
 
     return #parts > 0 and table.concat(parts, ",") or "-", giant
+end
+
+local function ButtonState(frame)
+    if not frame then return "none" end
+    local host = SafeField(frame, "cdmBuffGlowHost")
+    local button = SafeField(host, "_ButtonGlow")
+    if not button then return "none" end
+
+    local animIn = SafeField(button, "animIn")
+    local animOut = SafeField(button, "animOut")
+    local ants = SafeField(button, "ants")
+    local outerGlow = SafeField(button, "outerGlow")
+    local throttle = SafeNumber(SafeField(button, "throttle"))
+
+    return string.format(
+        "%s shown=%s alpha=%s in=%s out=%s antsA=%s outerA=%s throttle=%s",
+        FrameID(button),
+        SafeShown(button),
+        Dim(SafeCallNumber(button, "GetAlpha")),
+        SafePlaying(animIn),
+        SafePlaying(animOut),
+        Dim(SafeCallNumber(ants, "GetAlpha")),
+        Dim(SafeCallNumber(outerGlow, "GetAlpha")),
+        Dim(throttle)
+    )
 end
 
 local function Snapshot(frame)
@@ -270,6 +305,24 @@ end
 
 CDM.GlowLifecycleTrace = Record
 
+if LCG and not CDM.cdmGlowDiagLCGHooksInstalled then
+    CDM.cdmGlowDiagLCGHooksInstalled = true
+
+    hooksecurefunc(LCG, "ButtonGlow_Start", function(host)
+        if not enabled then return end
+        local frame = host and host:GetParent() or nil
+        CountEvent("LCG_BUTTON_START_ALL")
+        Push("LCG_BUTTON_START_ALL " .. ButtonState(frame) .. " " .. select(1, Snapshot(frame)))
+    end)
+
+    hooksecurefunc(LCG, "ButtonGlow_Stop", function(host)
+        if not enabled then return end
+        local frame = host and host:GetParent() or nil
+        CountEvent("LCG_BUTTON_STOP_ALL")
+        Push("LCG_BUTTON_STOP_ALL " .. ButtonState(frame) .. " " .. select(1, Snapshot(frame)))
+    end)
+end
+
 local function SampleFrame(frame)
     if not frame then return end
     local snap, giant = Snapshot(frame)
@@ -278,6 +331,14 @@ local function SampleFrame(frame)
         CountEvent("SAMPLE_CHANGE")
         Push("SAMPLE_CHANGE " .. snap)
     end
+
+    local buttonState = ButtonState(frame)
+    if lastButtonState[frame] ~= buttonState then
+        lastButtonState[frame] = buttonState
+        CountEvent("BUTTON_STATE_CHANGE")
+        Push("BUTTON_STATE " .. buttonState .. " " .. snap)
+    end
+
     if giant then
         anomalies = anomalies + 1
         Push("ANOMALY SAMPLE " .. snap)
@@ -307,6 +368,7 @@ local function Reset()
     wipe(requestCounts)
     wipe(requestRuns)
     wipe(lastSample)
+    wipe(lastButtonState)
     anomalies = 0
     sampleElapsed = 0
 end
