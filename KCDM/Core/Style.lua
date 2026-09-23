@@ -1741,7 +1741,7 @@ function CDM:InstallStyleAcquireResetHook(v)
     hooksecurefunc(v, "OnAcquireItemFrame", function(_, itemFrame)
         itemFrame.cdmInternalWrite = nil
         itemFrame.cdmPandemicShown = nil
-        if CDM.Glow then CDM.Glow:HidePandemicGlow(itemFrame) end
+        if CDM.Glow then CDM.Glow:HidePandemicGlow(itemFrame, true) end
         itemFrame.cdmLastCooldownStyleVer = nil
         itemFrame.cdmIsProcessingBuffOverride = nil
         itemFrame.cdmLastAuraActive = nil
