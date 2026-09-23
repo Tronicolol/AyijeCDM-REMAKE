@@ -1,0 +1,84 @@
+name: Validate glow lifecycle stability
+
+on:
+  push:
+    branches:
+      - fix-glow-lifecycle-stability
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-glow-lifecycle-stability
+          fetch-depth: 0
+
+      - name: Install Lua 5.1
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+
+      - name: Validate Lua XML and focused invariants
+        run: |
+          find KCDM KCDM_Options -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+          git diff --check origin/main...HEAD
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import xml.etree.ElementTree as ET
+
+          for root in (Path('KCDM'), Path('KCDM_Options')):
+              for xml in root.rglob('*.xml'):
+                  ET.parse(xml)
+
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', 'origin/main...HEAD'], text=True
+          ).splitlines())
+          changed.discard('.github/workflows/validate-glow-lifecycle-stability.yml')
+          expected = {
+              'KCDM/Modules/GlowController.lua',
+              'KCDM/Modules/GlowLifecycleDebug.lua',
+              'KCDM/Modules/embeds.xml',
+          }
+          assert changed == expected, (changed, expected)
+
+          c = Path('KCDM/Modules/GlowController.lua').read_text(encoding='utf-8')
+          assert 'local GEOMETRY_SETTLE_DELAY = 0.05' in c
+          assert 'QueueStableGeometryRefresh(self)' in c
+          assert 'RefreshFrame(self, true)' not in c.split('frame:HookScript("OnSizeChanged"', 1)[1].split('end)', 1)[0]
+          assert 'state.requests[producerToken] == nil' in c
+          assert 'RequestMatches(request, overrideColor, sourceID)' in c
+          assert 'local winnerToken = SelectWinner(frame, state)' in c
+          assert 'if winnerToken and winnerToken ~= producerToken then' in c
+          assert 'DebugTrace("REQUEST", frame, producerToken, false, sourceID)' in c
+          assert 'DebugTrace("REQUEST", frame, producerToken, true, sourceID)' in c
+
+          e = Path('KCDM/Modules/embeds.xml').read_text(encoding='utf-8')
+          assert e.index('GlowController.lua') < e.index('GlowLifecycleDebug.lua')
+          PY
+
+      - name: Build complete addon package
+        run: |
+          mkdir package
+          cp -a KCDM package/KCDM
+          cp -a KCDM_Options package/KCDM_Options
+
+      - name: Verify package roots
+        shell: python
+        run: |
+          from pathlib import Path
+          roots = sorted(p.name for p in Path('package').iterdir())
+          assert roots == ['KCDM', 'KCDM_Options'], roots
+          assert Path('package/KCDM/KCDM.toc').is_file()
+          assert Path('package/KCDM_Options/KCDM_Options.toc').is_file()
+          assert Path('package/KCDM/Modules/GlowLifecycleDebug.lua').is_file()
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KCDM-Glow-Stability-Test
+          path: package/
+          if-no-files-found: error
