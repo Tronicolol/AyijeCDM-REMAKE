@@ -225,6 +225,26 @@ local function SetCooldownTextHidden(frame, hidden)
     end
 end
 
+local function OverrideFrameCooldownText(frame, pixelSize, color)
+    if not frame then return end
+
+    local cd = frame.Cooldown
+    if cd then
+        OverrideCooldownText(cd.Text or cd.text, pixelSize, color)
+
+        if cd.GetRegions then
+            for _, region in ipairs({ cd:GetRegions() }) do
+                if region and region.IsObjectType and region:IsObjectType("FontString") then
+                    OverrideCooldownText(region, pixelSize, color)
+                end
+            end
+        end
+    end
+
+    OverrideCooldownText(frame.Time, pixelSize, color)
+    OverrideCooldownText(frame.Duration, pixelSize, color)
+end
+
 function CDM:RestoreCooldownTextIfHidden(frame)
     if frame.cdmCooldownTextHidden then
         SetCooldownTextHidden(frame, false)
@@ -546,12 +566,7 @@ function CDM:PositionBuffGroupFrames(groupIndex, frames, activeSpellSetParam, re
                         frame.cdmCooldownTextHidden = nil
                     end
                     if fCdFS or fCdColor then
-                        local cd = frame.Cooldown
-                        if cd then
-                            OverrideCooldownText(cd.Text or cd.text, fCdPixelSize, fCdColor)
-                        end
-                        OverrideCooldownText(frame.Time, fCdPixelSize, fCdColor)
-                        OverrideCooldownText(frame.Duration, fCdPixelSize, fCdColor)
+                        OverrideFrameCooldownText(frame, fCdPixelSize, fCdColor)
                     end
                 end
 
@@ -665,12 +680,7 @@ function CDM:ApplyGroupStyleOverrides()
                             frame.cdmCooldownTextHidden = nil
                         end
                         if cdFS or cdColor then
-                            local cd = frame.Cooldown
-                            if cd then
-                                OverrideCooldownText(cd.Text or cd.text, cdPixelSize, cdColor)
-                            end
-                            OverrideCooldownText(frame.Time, cdPixelSize, cdColor)
-                            OverrideCooldownText(frame.Duration, cdPixelSize, cdColor)
+                            OverrideFrameCooldownText(frame, cdPixelSize, cdColor)
                         end
                     end
 
@@ -828,12 +838,7 @@ function CDM:ApplyUngroupedBuffOverrides(frame)
         local cdFS = (useTextOv and ov.cooldownFontSize) or (db and db.buffCooldownFontSize or 12)
         local cdColor = (useTextOv and ov.cooldownColor) or (db and db.buffCooldownColor)
         local cdPixelSize = cdFS and Pixel.FontSize(cdFS)
-        local cd = frame.Cooldown
-        if cd then
-            OverrideCooldownText(cd.Text or cd.text, cdPixelSize, cdColor)
-        end
-        OverrideCooldownText(frame.Time, cdPixelSize, cdColor)
-        OverrideCooldownText(frame.Duration, cdPixelSize, cdColor)
+        OverrideFrameCooldownText(frame, cdPixelSize, cdColor)
     end
 
     local countText = frame.Applications and frame.Applications.Applications
