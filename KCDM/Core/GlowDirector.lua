@@ -27,6 +27,14 @@ resourceAwareEventFrame:Hide()
 local resourceAwareCdIDs = {}
 local resourceAwareCount = 0
 local resourceAwareRefreshPending = false
+local resourceAwareRefreshTrigger = "unknown"
+
+local function TraceReady(event, frame, ...)
+    local trace = CDM.GlowLifecycleTrace
+    if type(trace) == "function" then
+        trace(event, frame, ...)
+    end
+end
 
 local FanoutToFrames
 local QueueResourceAwareRefresh
@@ -72,26 +80,48 @@ local function ComputeCooldownReady(frame, spellID)
     if ci and ci.maxCharges and ci.maxCharges > 1 then
         local currentCharges = ci.currentCharges
         if IsSafeNumber(currentCharges) then
-            return currentCharges > 0
+            if currentCharges > 0 then
+                return true, "charges_available"
+            end
+            return false, "charges_empty"
         end
-        if not ci.isActive then return true end
-        return HasChargeSource(frame)
+        if not ci.isActive then
+            return true, "charges_inactive"
+        end
+        if HasChargeSource(frame) then
+            return true, "charges_visual_source"
+        end
+        return false, "charges_no_visual_source"
     end
 
     local info = C_Spell_GetSpellCooldown(spellID)
-    if not info then return false end
-    return (not info.isActive) or info.isOnGCD
+    if not info then
+        return false, "no_cooldown_info"
+    end
+    if info.isOnGCD then
+        return true, "gcd"
+    end
+    if not info.isActive then
+        return true, "cooldown_ready"
+    end
+    return false, "cooldown_active"
 end
 
 local function ComputeFrameReady(frame, spellID, entry)
-    if not ComputeCooldownReady(frame, spellID) then return false end
-    if entry and entry.readyGlowResourceAware then
-        return C_Spell_IsSpellUsable(spellID) == true
+    local cooldownReady, cooldownReason = ComputeCooldownReady(frame, spellID)
+    if not cooldownReady then
+        return false, cooldownReason
     end
-    return true
+    if entry and entry.readyGlowResourceAware then
+        if C_Spell_IsSpellUsable(spellID) == true then
+            return true, "resource_usable:" .. cooldownReason
+        end
+        return false, "resource_unusable:" .. cooldownReason
+    end
+    return true, cooldownReason
 end
 
-FanoutToFrames = function(cdID)
+FanoutToFrames = function(cdID, trigger)
     local frames = framesByCdID[cdID]
     if not frames then return end
     local sync = CDM.SyncReadyGlowForFrame
@@ -101,16 +131,27 @@ FanoutToFrames = function(cdID)
     local spellID = spellIDByCdID[cdID]
     for frame in pairs(frames) do
         if frame.cdmGlowDirectorCdID == cdID and frame.cooldownID == cdID then
-            sync(frame, entry, spellID, ComputeFrameReady(frame, spellID, entry))
+            local ready, reason = ComputeFrameReady(frame, spellID, entry)
+            TraceReady(
+                "READY_COMPUTE",
+                frame,
+                cdID,
+                spellID,
+                ready == true,
+                reason,
+                entry and entry.readyGlowResourceAware == true,
+                trigger or "direct"
+            )
+            sync(frame, entry, spellID, ready)
         end
     end
 end
 
-local function RequestFanout(cdID)
+local function RequestFanout(cdID, trigger)
     if resourceAwareCdIDs[cdID] then
-        QueueResourceAwareRefresh()
+        QueueResourceAwareRefresh(trigger)
     else
-        FanoutToFrames(cdID)
+        FanoutToFrames(cdID, trigger)
     end
 end
 
@@ -125,13 +166,16 @@ local function WireCooldownDone(frame)
         C_Timer_After(0, function()
             local cdID = frame.cdmGlowDirectorCdID
             if cdID and frame.cooldownID == cdID then
-                RequestFanout(cdID)
+                RequestFanout(cdID, "cooldown_done")
             end
         end)
     end)
 end
 
-QueueResourceAwareRefresh = function()
+QueueResourceAwareRefresh = function(trigger)
+    if trigger then
+        resourceAwareRefreshTrigger = trigger
+    end
     if resourceAwareRefreshPending or resourceAwareCount == 0 then return end
     resourceAwareRefreshPending = true
     resourceAwareEventFrame:Show()
@@ -140,21 +184,31 @@ end
 resourceAwareEventFrame:SetScript("OnUpdate", function(self)
     self:Hide()
     resourceAwareRefreshPending = false
+    local trigger = resourceAwareRefreshTrigger
+    resourceAwareRefreshTrigger = "unknown"
     for cdID in pairs(resourceAwareCdIDs) do
-        FanoutToFrames(cdID)
+        FanoutToFrames(cdID, trigger)
     end
 end)
 
-resourceAwareEventFrame:SetScript("OnEvent", function()
-    QueueResourceAwareRefresh()
+resourceAwareEventFrame:SetScript("OnEvent", function(_, event)
+    QueueResourceAwareRefresh("resource_event:" .. tostring(event))
 end)
 
 OnSpellEvent = function(spellID, cooldownsChanged, chargesChanged)
     if not (cooldownsChanged or chargesChanged) then return end
     local cdIDs = cdIDsBySpellID[spellID]
     if not cdIDs then return end
+    local trigger
+    if cooldownsChanged and chargesChanged then
+        trigger = "spell_event:cooldown+charges"
+    elseif chargesChanged then
+        trigger = "spell_event:charges"
+    else
+        trigger = "spell_event:cooldown"
+    end
     for cdID in pairs(cdIDs) do
-        RequestFanout(cdID)
+        RequestFanout(cdID, trigger)
     end
 end
 
@@ -238,7 +292,7 @@ function GlowDirector:OnCooldownIDSet(frame)
     frame.cdmGlowDirectorCdID = cdID
 
     WireCooldownDone(frame)
-    RequestFanout(cdID)
+    RequestFanout(cdID, "cooldown_id_set")
 end
 
 function GlowDirector:OnCooldownIDCleared(frame)
@@ -266,7 +320,7 @@ local function QueueAcquireResync(frame)
         end
 
         if frame.cdmGlowDirectorCdID == cdID then
-            RequestFanout(cdID)
+            RequestFanout(cdID, "acquire_resync")
         else
             GlowDirector:OnCooldownIDSet(frame)
         end
@@ -320,10 +374,21 @@ function GlowDirector:RefreshFrame(frame)
 
     local spellID = spellIDByCdID[cdID]
     if resourceAwareCdIDs[cdID] then
-        QueueResourceAwareRefresh()
+        QueueResourceAwareRefresh("refresh_frame")
         return
     end
-    sync(frame, entry, spellID, ComputeFrameReady(frame, spellID, entry))
+    local ready, reason = ComputeFrameReady(frame, spellID, entry)
+    TraceReady(
+        "READY_COMPUTE",
+        frame,
+        cdID,
+        spellID,
+        ready == true,
+        reason,
+        entry and entry.readyGlowResourceAware == true,
+        "refresh_frame"
+    )
+    sync(frame, entry, spellID, ready)
 end
 
 function GlowDirector:RebuildIndex()
