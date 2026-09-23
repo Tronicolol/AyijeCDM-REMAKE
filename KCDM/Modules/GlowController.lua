@@ -38,13 +38,6 @@ local procOpts = {
     frameLevel = 5,
 }
 
-local function DebugTrace(event, frame, ...)
-    local trace = CDM.GlowLifecycleTrace
-    if type(trace) == "function" then
-        trace(event, frame, ...)
-    end
-end
-
 local function GetCfg(key, fallback)
     local db = CDM.db or {}
     local defaults = CDM.defaults or {}
@@ -132,7 +125,6 @@ end
 
 local function HardStopHost(host)
     if not host then return end
-    DebugTrace("HARD_STOP", host:GetParent(), host)
 
     -- Stop library-owned objects before hiding their parent. In particular,
     -- ButtonGlow has an OnHide cleanup path that may release its pooled frame.
@@ -155,7 +147,6 @@ local function HardStopHost(host)
 end
 
 local function StartOrUpdateHost(host, glowType, overrideColor)
-    DebugTrace("LCG_START", host:GetParent(), host, glowType)
     local color = GetVisualColor(overrideColor)
     if glowType == "pixel" then
         local length = GetCfg("glowPixelLength", 0)
@@ -426,7 +417,6 @@ end
 
 local function FinishLayoutMutation(generation)
     if not layoutMutationSuspended then return end
-    DebugTrace("LAYOUT_FINISH_ATTEMPT", nil, generation, layoutMutationGeneration)
     if layoutMutationGeneration ~= generation then return end
     if specTransitionSuspended then return end
 
@@ -465,7 +455,6 @@ end
 
 local function BeginLayoutMutation()
     layoutMutationGeneration = layoutMutationGeneration + 1
-    DebugTrace("LAYOUT_BEGIN", nil, layoutMutationGeneration)
 
     if not layoutMutationSuspended then
         layoutMutationSuspended = true
@@ -528,7 +517,6 @@ local function ApplyVisual(frame, request, forceUpdate)
         and RenderedColorMatches(host, request.overrideColor)
         and host.cdmUnifiedGlowVersion == version
 
-    DebugTrace("APPLY", frame, host, glowType, sameVisual, forceUpdate == true)
 
     if not sameVisual then
         if host.cdmGlowActive and host.cdmGlowType == glowType then
@@ -587,7 +575,6 @@ local function EnsureFrameHooks(frame)
     if hookedFrames[frame] then return end
     hookedFrames[frame] = true
     frame:HookScript("OnShow", function(self)
-        DebugTrace("FRAME_SHOW", self)
         local state = states[self]
         if state then
             local forceGeometry = state.geometryDirty == true
@@ -596,12 +583,10 @@ local function EnsureFrameHooks(frame)
         end
     end)
     frame:HookScript("OnHide", function(self)
-        DebugTrace("FRAME_HIDE", self)
         local host = self.cdmBuffGlowHost
         if host then host:Hide() end
     end)
-    frame:HookScript("OnSizeChanged", function(self, width, height)
-        DebugTrace("SIZE", self, width, height)
+    frame:HookScript("OnSizeChanged", function(self)
         if states[self] then
             QueueStableGeometryRefresh(self)
         end
@@ -672,12 +657,10 @@ Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideCol
                 return
             end
 
-            DebugTrace("REQUEST", frame, producerToken, false, sourceID)
             RefreshFrame(frame, false)
             return
         end
 
-        DebugTrace("REQUEST", frame, producerToken, false, sourceID)
         state.requests[producerToken] = nil
         RefreshFrame(frame, false)
         return
@@ -710,7 +693,6 @@ Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideCol
         end
     end
 
-    DebugTrace("REQUEST", frame, producerToken, true, sourceID)
 
     request = request or {}
     state.requests[producerToken] = request
