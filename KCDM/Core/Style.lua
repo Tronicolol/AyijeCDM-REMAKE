@@ -499,23 +499,41 @@ local function ApplyReadyGlow(frame, entry)
 end
 
 local function GetReadyGlowDecision(frame, entry, spellID, isReady)
-    if not entry or not entry.readyGlowEnabled then
-        return true, false
+    if not entry then
+        return true, false, "entry_missing"
+    end
+    if not entry.readyGlowEnabled then
+        return true, false, "ready_disabled"
     end
     if frame.cdmLastAuraActive then
-        return true, false
+        return true, false, "aura_active"
     end
     if entry.auraOverlay and entry.auraDesaturateInactive then
-        return true, false
+        return true, false, "aura_desat_inactive"
     end
     if not spellID then
-        return false, false
+        return false, false, "spell_unknown"
     end
-    return true, isReady
+    if isReady then
+        return true, true, "ready_true"
+    end
+    return true, false, "ready_false"
 end
 
 local function SyncReadyGlow(frame, entry, spellID, isReady)
-    local decisionKnown, shouldShowReadyGlow = GetReadyGlowDecision(frame, entry, spellID, isReady)
+    local decisionKnown, shouldShowReadyGlow, reason = GetReadyGlowDecision(frame, entry, spellID, isReady)
+    local trace = CDM.GlowLifecycleTrace
+    if type(trace) == "function" then
+        trace(
+            "READY_DECISION",
+            frame,
+            spellID,
+            isReady == true,
+            reason,
+            shouldShowReadyGlow == true,
+            entry and entry.readyGlowResourceAware == true
+        )
+    end
     if not decisionKnown then
         return
     end
