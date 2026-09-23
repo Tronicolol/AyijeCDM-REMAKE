@@ -604,6 +604,50 @@ function CDM:PositionBuffGroupFrames(groupIndex, frames, activeSpellSetParam, re
 
 end
 
+function CDM:ReapplyGroupedBuffCooldownText(frame)
+    if not frame then return end
+
+    local sets = self.BuffGroupSets
+    local spellID = frame.cdmBuffCategorySpellID
+    local groupIdx = spellID and sets and sets.grouped and sets.grouped[spellID]
+    local groupData = groupIdx and sets.groups and sets.groups[groupIdx]
+    if not groupData then return end
+
+    local spellOv = GetSpellOverride(groupData, spellID)
+    local useTextOv = spellOv and spellOv.textOverride == true
+    local hideCooldown = spellOv and spellOv.hideCooldown == true
+
+    if hideCooldown then
+        SetCooldownTextHidden(frame, true)
+        frame.cdmCooldownTextHidden = true
+        return
+    end
+
+    if frame.cdmCooldownTextHidden then
+        SetCooldownTextHidden(frame, false)
+        frame.cdmCooldownTextHidden = nil
+    end
+
+    local cdFS = (useTextOv and spellOv.cooldownFontSize) or groupData.cooldownFontSize or 12
+    local cdColor = (useTextOv and spellOv.cooldownColor) or groupData.cooldownColor or { r = 1, g = 1, b = 1 }
+    local cdPixelSize = cdFS and Pixel.FontSize(cdFS)
+
+    local cd = frame.Cooldown
+    if cd then
+        OverrideCooldownText(cd.Text or cd.text, cdPixelSize, cdColor)
+        if cd.GetRegions then
+            for _, region in ipairs({ cd:GetRegions() }) do
+                if region and region.IsObjectType and region:IsObjectType("FontString") then
+                    OverrideCooldownText(region, cdPixelSize, cdColor)
+                end
+            end
+        end
+    end
+
+    OverrideCooldownText(frame.Time, cdPixelSize, cdColor)
+    OverrideCooldownText(frame.Duration, cdPixelSize, cdColor)
+end
+
 function CDM:ApplyGroupStyleOverrides()
     local sets = self.BuffGroupSets
     if not sets or not sets.groups or not sets.grouped then return end
