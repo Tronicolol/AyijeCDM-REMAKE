@@ -797,6 +797,16 @@ local function EnsureFrameHooks(frame, hookType)
             frame.cdmBuffSwipeHooked = true
             hooksecurefunc(cd, "SetCooldown", function()
                 ApplyBaseSwipeStyle(cd, frame)
+
+                if frame.cdmBuffCooldownTextRefreshPending then return end
+                frame.cdmBuffCooldownTextRefreshPending = true
+                C_Timer.After(0, function()
+                    frame.cdmBuffCooldownTextRefreshPending = nil
+                    if not frame:IsShown() then return end
+                    if CDM.ReapplyGroupedBuffCooldownText then
+                        CDM:ReapplyGroupedBuffCooldownText(frame)
+                    end
+                end)
             end)
         end
     end
