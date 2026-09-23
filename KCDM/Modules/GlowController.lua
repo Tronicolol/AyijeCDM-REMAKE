@@ -26,6 +26,7 @@ local layoutMutationSuspended = false
 local layoutMutationGeneration = 0
 local resetSnapshot = {}
 local LAYOUT_SETTLE_DELAY = 0.12
+local GEOMETRY_SETTLE_DELAY = 0.05
 
 local procOpts = {
     color = nil,
@@ -332,7 +333,14 @@ end
 local function GetState(frame, create)
     local state = states[frame]
     if not state and create then
-        state = { requests = {}, stopGeneration = 0, acquireGeneration = 0, boundCooldownID = frame.cooldownID }
+        state = {
+            requests = {},
+            stopGeneration = 0,
+            acquireGeneration = 0,
+            sizeGeneration = 0,
+            geometryDirty = false,
+            boundCooldownID = frame.cooldownID,
+        }
         states[frame] = state
     end
     return state
@@ -441,8 +449,10 @@ local function FinishLayoutMutation(generation)
         CDM.GlowDirector:RebuildIndex()
     end
 
-    for frame in pairs(states) do
-        RefreshFrame(frame, false)
+    for frame, state in pairs(states) do
+        local forceGeometry = state.geometryDirty == true
+        state.geometryDirty = false
+        RefreshFrame(frame, forceGeometry)
     end
 end
 
@@ -540,12 +550,50 @@ local function ApplyVisual(frame, request, forceUpdate)
     host:SetShown(frame:IsShown())
 end
 
+local function QueueStableGeometryRefresh(frame)
+    local state = states[frame]
+    if not state then return end
+
+    state.sizeGeneration = (state.sizeGeneration or 0) + 1
+    state.geometryDirty = true
+    local generation = state.sizeGeneration
+
+    C_Timer.After(GEOMETRY_SETTLE_DELAY, function()
+        if states[frame] ~= state then return end
+        if state.sizeGeneration ~= generation then return end
+        if IsPrimaryGlowSuspended() then return end
+        if not frame:IsShown() then return end
+
+        state.geometryDirty = false
+        RefreshFrame(frame, true)
+    end)
+end
+
+local function RequestMatches(request, overrideColor, sourceID)
+    if not request or request.sourceID ~= sourceID then return false end
+    if request.overrideColor == overrideColor then return true end
+    if not request.overrideColor or not overrideColor then return false end
+
+    local hasA, ar, ag, ab, aa = GetEffectiveColorValues(request.overrideColor)
+    local hasB, br, bg, bb, ba = GetEffectiveColorValues(overrideColor)
+    return hasA == hasB
+        and ar == br
+        and ag == bg
+        and ab == bb
+        and aa == ba
+end
+
 local function EnsureFrameHooks(frame)
     if hookedFrames[frame] then return end
     hookedFrames[frame] = true
     frame:HookScript("OnShow", function(self)
         DebugTrace("FRAME_SHOW", self)
-        if states[self] then RefreshFrame(self, false) end
+        local state = states[self]
+        if state then
+            local forceGeometry = state.geometryDirty == true
+            state.geometryDirty = false
+            RefreshFrame(self, forceGeometry)
+        end
     end)
     frame:HookScript("OnHide", function(self)
         DebugTrace("FRAME_HIDE", self)
@@ -554,7 +602,9 @@ local function EnsureFrameHooks(frame)
     end)
     frame:HookScript("OnSizeChanged", function(self, width, height)
         DebugTrace("SIZE", self, width, height)
-        if states[self] then RefreshFrame(self, true) end
+        if states[self] then
+            QueueStableGeometryRefresh(self)
+        end
     end)
     if type(frame.SetCooldownID) == "function" then
         hooksecurefunc(frame, "SetCooldownID", function(self)
@@ -600,7 +650,6 @@ end
 
 Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideColor, sourceID)
     if not frame or not VALID_PRODUCERS[producerToken] then return end
-    DebugTrace("REQUEST", frame, producerToken, enabled == true, sourceID)
     if specTransitionSuspended then
         ClearCompat(frame)
         local host = frame.cdmBuffGlowHost
@@ -608,22 +657,63 @@ Glow.RequestBuffGlow = function(self, frame, producerToken, enabled, overrideCol
         states[frame] = nil
         return
     end
+
     local state = GetState(frame, false)
     if state and state.boundCooldownID ~= nil and frame.cooldownID ~= nil and state.boundCooldownID ~= frame.cooldownID then
         ResetPrimary(frame)
         state = nil
     end
-    if not state and enabled then state = GetState(frame, true) end
-    if not state then return end
-    if enabled then
-        if frame.cooldownID ~= nil then state.boundCooldownID = frame.cooldownID end
-        local request = state.requests[producerToken] or {}
-        state.requests[producerToken] = request
-        request.overrideColor = overrideColor
-        request.sourceID = sourceID
-    else
+
+    if not enabled then
+        if not state then return end
+
+        if state.requests[producerToken] == nil then
+            if frame.cdmGlowProducer ~= producerToken then
+                return
+            end
+
+            DebugTrace("REQUEST", frame, producerToken, false, sourceID)
+            RefreshFrame(frame, false)
+            return
+        end
+
+        DebugTrace("REQUEST", frame, producerToken, false, sourceID)
         state.requests[producerToken] = nil
+        RefreshFrame(frame, false)
+        return
     end
+
+    if not state then
+        state = GetState(frame, true)
+    end
+
+    if frame.cooldownID ~= nil then
+        state.boundCooldownID = frame.cooldownID
+    end
+
+    local request = state.requests[producerToken]
+    if RequestMatches(request, overrideColor, sourceID) then
+        if IsPrimaryGlowSuspended() then
+            return
+        end
+
+        if frame.cdmGlowProducer ~= producerToken then
+            return
+        end
+
+        local host = frame.cdmBuffGlowHost
+        if host and host.cdmGlowActive then
+            return
+        end
+    end
+
+    DebugTrace("REQUEST", frame, producerToken, true, sourceID)
+
+    request = request or {}
+    state.requests[producerToken] = request
+    request.overrideColor = overrideColor
+    request.sourceID = sourceID
+
     RefreshFrame(frame, false)
 end
 
