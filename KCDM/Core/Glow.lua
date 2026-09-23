@@ -497,8 +497,20 @@ local function SyncPandemicGlowHostFrame(frame, host)
     end
 end
 
+local PANDEMIC_HIDE_DELAY = 0.10
+
+local function HidePandemicGlowNow(frame)
+    local host = frame and frame.cdmPandemicGlowHost
+    if host then
+        HideCustomGlow(host)
+        host:Hide()
+    end
+end
+
 function Glow:ShowPandemicGlow(frame, glowType, color)
     if not frame or not LCG then return end
+
+    frame.cdmPandemicGlowGeneration = (frame.cdmPandemicGlowGeneration or 0) + 1
 
     local host = EnsurePandemicGlowHostFrame(frame)
     if not host then return end
@@ -514,24 +526,32 @@ function Glow:ShowPandemicGlow(frame, glowType, color)
     end
 end
 
-function Glow:HidePandemicGlow(frame)
+function Glow:HidePandemicGlow(frame, immediate)
     if not frame then return end
+
+    frame.cdmPandemicGlowGeneration = (frame.cdmPandemicGlowGeneration or 0) + 1
+    local generation = frame.cdmPandemicGlowGeneration
 
     frame.cdmPandemicGlowWanted = nil
     frame.cdmPandemicGlowType = nil
     frame.cdmPandemicGlowColor = nil
 
-    local host = frame.cdmPandemicGlowHost
-    if host then
-        HideCustomGlow(host)
-        host:Hide()
+    if immediate then
+        HidePandemicGlowNow(frame)
+        return
     end
+
+    C_Timer.After(PANDEMIC_HIDE_DELAY, function()
+        if frame.cdmPandemicGlowGeneration ~= generation then return end
+        if frame.cdmPandemicGlowWanted then return end
+        HidePandemicGlowNow(frame)
+    end)
 end
 
 function Glow:StopGlow(frame)
     if frame then
         pendingVisualHideFrames[frame] = nil
-        self:HidePandemicGlow(frame)
+        self:HidePandemicGlow(frame, true)
         frame.cdmGlowProducer = nil
         frame.cdmBuffGlowWanted = nil
         frame.cdmBuffGlowSourceID = nil
@@ -625,7 +645,7 @@ function Glow:InstallAcquireResetHook(v)
         Glow:RequestBuffGlow(itemFrame, "aura", false)
         Glow:RequestBuffGlow(itemFrame, "alert", false)
         Glow:RequestBuffGlow(itemFrame, "buff", false)
-        Glow:HidePandemicGlow(itemFrame)
+        Glow:HidePandemicGlow(itemFrame, true)
     end)
 end
 
