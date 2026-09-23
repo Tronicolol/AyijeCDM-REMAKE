@@ -705,7 +705,7 @@ end
 Glow.StopGlow = function(self, frame)
     if not frame then return end
     ResetPrimary(frame)
-    if self.HidePandemicGlow then self:HidePandemicGlow(frame) end
+    if self.HidePandemicGlow then self:HidePandemicGlow(frame, true) end
 end
 
 Glow.InstallAcquireResetHook = function(self, viewer)
@@ -737,7 +737,7 @@ Glow.InstallAcquireResetHook = function(self, viewer)
         end
 
         if self.HidePandemicGlow then
-            self:HidePandemicGlow(itemFrame)
+            self:HidePandemicGlow(itemFrame, true)
         end
     end)
 end
