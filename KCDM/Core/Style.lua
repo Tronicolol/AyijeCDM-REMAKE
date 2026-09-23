@@ -487,7 +487,16 @@ local function ClearReadyGlow(frame)
     CDM.Glow:RequestBuffGlow(frame, "ready", false)
 end
 
+local function ClearCooldownTintForReady(frame)
+    local tint = frame and frame.cdmCooldownTintOverlay
+    if tint then
+        tint:Hide()
+    end
+end
+
 local function ApplyReadyGlow(frame, entry)
+    ClearCooldownTintForReady(frame)
+
     if frame.cdmGlowProducer == "ready"
        and frame.cdmBuffGlowOverrideColor == entry.readyGlowColor then
         local host = frame.cdmBuffGlowHost
@@ -496,6 +505,7 @@ local function ApplyReadyGlow(frame, entry)
         end
     end
     CDM.Glow:RequestBuffGlow(frame, "ready", true, entry.readyGlowColor, nil)
+    ClearCooldownTintForReady(frame)
 end
 
 local function GetReadyGlowDecision(frame, entry, spellID, isReady)
