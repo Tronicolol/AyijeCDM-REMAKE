@@ -100,6 +100,59 @@ local function CollectCooldownTexts(frame, output)
 end
 
 local cooldownTextScratch = {}
+local nextBuffCooldownOverrideFontID = 0
+
+local function EnsureBuffCooldownOverrideFont(frame)
+    local font = frame and frame.cdmBuffCooldownOverrideFont
+    local fontName = frame and frame.cdmBuffCooldownOverrideFontName
+    if font and fontName then
+        return font, fontName
+    end
+
+    nextBuffCooldownOverrideFontID = nextBuffCooldownOverrideFontID + 1
+    fontName = "KCDM_BuffCooldownOverrideFont" .. nextBuffCooldownOverrideFontID
+    font = CreateFont(fontName)
+
+    frame.cdmBuffCooldownOverrideFont = font
+    frame.cdmBuffCooldownOverrideFontName = fontName
+    return font, fontName
+end
+
+local function ApplyBuffCooldownFontOverride(frame, override)
+    local cooldown = frame and frame.Cooldown
+    if not cooldown or not cooldown.SetCountdownFont then return end
+
+    local enabled = override and override.textOverride == true
+    if not enabled then
+        if frame.cdmBuffCooldownOverrideFontActive then
+            cooldown:SetCountdownFont("KCDM_CDFont_Buff")
+            frame.cdmBuffCooldownOverrideFontActive = nil
+        end
+        return
+    end
+
+    local baseFont = _G["KCDM_CDFont_Buff"]
+    if not baseFont then return end
+
+    local fontPath, baseSize, flags = baseFont:GetFont()
+    if not fontPath then return end
+
+    local font, fontName = EnsureBuffCooldownOverrideFont(frame)
+    local size = override.cooldownFontSize
+    local pixelSize = size and Pixel and Pixel.FontSize and Pixel.FontSize(size) or size or baseSize
+    font:SetFont(fontPath, pixelSize, flags)
+
+    local color = override.cooldownColor
+    if color then
+        font:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+    else
+        local r, g, b, a = baseFont:GetTextColor()
+        font:SetTextColor(r or 1, g or 1, b or 1, a or 1)
+    end
+
+    cooldown:SetCountdownFont(fontName)
+    frame.cdmBuffCooldownOverrideFontActive = true
+end
 
 local function ApplyCooldownTextControls(frame, override, target)
     if not frame then return end
@@ -217,6 +270,7 @@ local function ApplyBuffTextExtensions(frame, groupData)
     if not frame or not groupData then return end
     local spellID = frame.cdmBuffCategorySpellID
     local override = ResolveBuffOverride(groupData, spellID)
+    ApplyBuffCooldownFontOverride(frame, override)
     ApplyCooldownTextControls(frame, override, frame)
     local applications = frame.Applications and frame.Applications.Applications
     ApplyChargeTextControls(
